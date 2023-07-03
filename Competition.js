@@ -8,13 +8,15 @@ var Competition = (function () {
         let myId = ++id;
         let settings = new Map([])
         let phases = [];
+        let associatedDivFlesh;
 
         defineGetter({ obj: this, name: "name", func: () => name });
         defineGetter({ obj: this, name: "id", func: () => myId });
         defineGetter({ obj: this, name: "currentSettings", func: () => mapToObjectArray(settings, "setting", "value") });
         defineGetter({ obj: this, name: "allPhasesArray", func: () => Array.from(phases) });
         defineGetter({ obj: this, name: "allGamesArray", func: () => this.allPhasesArray.reduce((acc,cv)=>{acc.push(...cv.allGamesInPhase);return acc;},[]) });
-
+        defineGetter({ obj: this, name: "flesh", func: () => associatedDivFlesh });
+        defineSetter({ obj: this, name: "flesh", func: (mainDiv) => associatedDivFlesh=mainDiv });
         this.newPhase = function (phaseName,phaseType) {
             let newPhase = new Phase({ name: phaseName, parent: this, phaseType });
             phases.push(newPhase)

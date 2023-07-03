@@ -20,6 +20,7 @@ var Game = (function () {
         defineGetter({ obj: this, name: "incomingLinks", func: () => Array.from(links.keys()).filter((cv) => cv.target === this) });
         defineGetter({ obj: this, name: "block", func: () => parent });
         defineGetter({ obj: this, name: "parent", func: () => parent });
+        defineGetter({ obj: this, name: "gameOrder", func: () => parent.allGamesArray.indexOf(this)+1 });
         defineGetter({ obj: this, name: "flesh", func: () => associatedDivFlesh });
         defineSetter({ obj: this, name: "flesh", func: (mainDiv) => associatedDivFlesh=mainDiv });
         defineGetter({ obj: this, name: "id", func: () => myId });

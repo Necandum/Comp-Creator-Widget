@@ -145,7 +145,7 @@ var TableGenerator = (function TableGeneratorBuilder(comp) {
         frag.append(button);
         return frag
     })();
-    //  HtmlTemplates.linkCreation = parseHTML("<select><option> Hi </option> <option selected disabled>Yay</option></select>")
+
     HtmlTemplates.linkCreation = function () {
         let frag = new DocumentFragment();
         let sourceTypeSelect = document.createElement('select');
@@ -165,7 +165,7 @@ var TableGenerator = (function TableGeneratorBuilder(comp) {
         defaultOption.disabled = 'disabled';
 
         let sourceRankInput = document.createElement('input');
-        sourceRankInput.classList.add("numericalInput", "short")
+        sourceRankInput.classList.add("numericalInput", "short", 'sourceRankInput')
         sourceRankInput.type = 'number'; sourceRankInput.min = 1; sourceRankInput.value = 1;
         frag.append(sourceSelect, sourceTypeSelect, sourceRankInput);
         return frag
@@ -245,7 +245,7 @@ var TableGenerator = (function TableGeneratorBuilder(comp) {
             for (const member of updatedList) {
                 const option = document.createElement('option');
                 option.append(member.name);
-                this.save({ element: sourceSelect, dataArr: [{ key: option, value: member }] })
+                this.save({ element: sourceSelect, dataArr: [{ key: option, value: member },{key:member,value:option}]})
                 if (member === this.quickLoad('source')) option.selected = 'selected';
                 frag.append(option)
             }
@@ -324,6 +324,7 @@ var TableGenerator = (function TableGeneratorBuilder(comp) {
             onCreationCode: (gameContainer) => {
                 let myBlock = gameContainer.elder['block'].quickLoad("Associated");
                 let newGame = myBlock.newGame();
+                bond(gameContainer,newGame)
                 CodeObserver.register(newGame); 
                 CodeObserver.addHandler(newGame, ({ mark }) => {
                     if (mark.validity.status) {
@@ -350,6 +351,7 @@ var TableGenerator = (function TableGeneratorBuilder(comp) {
                 let phaseContainer = blockContainer.root;
                 let myPhase = phaseContainer.quickLoad("Associated");
                 let newBlock = myPhase.newBlock();
+                bond(blockContainer,newBlock);
                 blockContainer.quickSave("Associated", newBlock);
                 CodeObserver.register(newBlock); 
                 CodeObserver.addHandler(newBlock, ({ mark }) => {
@@ -393,7 +395,10 @@ var TableGenerator = (function TableGeneratorBuilder(comp) {
             addAsElder: "table",
             htmlInsert: HtmlTemplates.addButton,
             addEvents: [EventTemplates.onButtonNew(this.phaseTemplate)],
-            addTemplates: [TableGenerator.phaseConstructor.controlPanel,this.phaseTemplate]
+            addTemplates: [TableGenerator.phaseConstructor.controlPanel,this.phaseTemplate],
+            onCreationCode:(mainDiv)=>{
+                bond(mainDiv,comp);
+            }
         })
         delete this.init;
     }

@@ -6,6 +6,7 @@ var Block = (function () {
         let validity = {status:true,message:""}
         let thisBlock=this;
         let objectionableLinks=new Set();
+        let associatedDivFlesh;
         
         defineGetter({ obj: this, name: "allGamesArray", func: () => Array.from(games) });
         defineGetter({ obj: this, name: "id", func: () => myId });
@@ -18,7 +19,8 @@ var Block = (function () {
             games.forEach(iGame=>allIncomingLinks.push(...iGame.incomingLinks));
             return allIncomingLinks;
         } });
-
+        defineGetter({ obj: this, name: "flesh", func: () => associatedDivFlesh });
+        defineSetter({ obj: this, name: "flesh", func: (mainDiv) => associatedDivFlesh=mainDiv });
 
         this.removeParent = function () {
             let tempParent = parent;

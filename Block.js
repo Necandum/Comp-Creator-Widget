@@ -6,7 +6,7 @@ var Block = (function () {
         let validity = {status:true,message:""}
         let thisBlock=this;
         let objectionableLinks=new Set();
-
+        
         defineGetter({ obj: this, name: "allGamesArray", func: () => Array.from(games) });
         defineGetter({ obj: this, name: "id", func: () => myId });
         defineGetter({ obj: this, name: "name", func: () => (name) ? name : `B${parent.allBlocksArray.indexOf(this) + 1}` });

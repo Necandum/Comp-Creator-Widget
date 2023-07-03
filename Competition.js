@@ -39,7 +39,6 @@ var Competition = (function () {
 })()
 
 
-
 /**
      * @param {Game|Phase} startingUnit 
      * @returns {{similarLinks:Set,registry:Map}}
@@ -53,21 +52,17 @@ function sourceTrackBack(startingUnit) {
     let startUnitConfirmed = startingUnit?.incomingLinks[0]?.target
     let incomingLinks = startingUnit.incomingLinks;
     let startingLinks = new Set(incomingLinks)
+   
     incomingLinks.forEach((startLink) => {innerSourceTrackBack(startLink)});
-    return {similarLinks,registry,phaseRegistry};
+    return {similarLinks,registry,phaseRegistry,loopCreated};
 
     function innerSourceTrackBack(link) {
-        
         let registryResult = registry.get(link.source)?.[link.sourceRank];
         let phaseRegistryResult = phaseRegistry.get(link.source.phase);
         
         for (const otherLink of registryResult ?? []) {
-            // if (otherLink.target === link.target) { //the two link are the same, as target, source and sourceRank are all the same. 
-                // continue;
-            // } else {
-                similarLinks.add(otherLink); //now that this is not visiting the same literal link twice, the if statement ^^this shouldn't be necessary
+                similarLinks.add(otherLink);
                 similarLinks.add(link);        
-            // }
         }
         if(phaseRegistryResult && !(link.source instanceof phaseRegistryResult.sourceType)) {
             similarLinks.add(link);
@@ -78,10 +73,10 @@ function sourceTrackBack(startingUnit) {
         let nextLinks = link.source?.incomingLinks ?? [];
         for(const nextLink of nextLinks){
             if(nextLink.source === startUnitConfirmed || startingLinks.has(nextLink)){
-                Alert("You've created a loop",{startingUnit,link})
+                Alert(`You've created a loop`,{startingUnit,nextLink,nextLinks},false)
                 loopCreated = true;
-                similarLinks.add(link)
-                continue;
+                //similarLinks.add(link)
+                break;
             }
             if(!visitedSources.has(nextLink)){
                 innerSourceTrackBack(nextLink)

@@ -184,7 +184,7 @@ var Phase = (function () {
             })
 
             
-                
+        if(phaseType===e.ROUND_ROBIN){
             let overlappingAncestorSources = sourceTrackBackResult.similarLinks;
                 if (overlappingAncestorSources.size>0) {
                     failValidity("Potential for same team to play itself. The same source appears with the same rank twice in this Phase's past. ")
@@ -198,6 +198,7 @@ var Phase = (function () {
                         this.liftDistantObjection(link);
                     }
                 }
+            }
             
             if (validity.status !== testValidity.status || validity.message !== testValidity.message) changeValidity(testValidity);
             return validity

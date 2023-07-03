@@ -15,22 +15,15 @@ newTeam("C")
 newTeam("D")
 newTeam("E")
 newTeam("F")
+newTeam("G")
+newTeam("H")
 let phases = {
-    1: comp.allPhasesArray[0]
 }
 
 let blocks = {
-    1: {
-        1: phases[1].allBlocksArray[0]
-    }
 }
 
 let games = {
-    1: {
-        1: {
-            1: blocks[1][1].allGamesArray[0]
-        }
-    }
 }
 
 function newTeam(name) {
@@ -52,7 +45,7 @@ function newPhase({ name = "X", phaseType = e.ROUND_ROBIN, phasePriority = 1 } =
     phases[phaseContainer.spirit.id] = phaseContainer.spirit;
     blocks[phaseContainer.spirit.id]={[phaseContainer.spirit.allBlocksArray[0].blockOrder]:phaseContainer.spirit.allBlocksArray[0]}
     games[phaseContainer.spirit.id]={
-                        [phaseContainer.spirit.allBlocksArray[0].id]:{
+                        [phaseContainer.spirit.allBlocksArray[0].blockOrder]:{
                             [phaseContainer.spirit.allBlocksArray[0].allGamesArray[0].gameOrder]:phaseContainer.spirit.allBlocksArray[0].allGamesArray[0]
                         }};
                                       
@@ -86,12 +79,21 @@ function setLink(game, { index = 0, source,sourceRank=1 }) {
     sourceSelect.dispatchEvent(mEvent.input)
 
 }
-
+newPhase({phaseType:e.TOURNAMENT,name:"T"})
 newGame(blocks[1][1])
 newBlock(phases[1])
 newGame(blocks[1][2])
 newBlock(phases[1])
 
+
+
+newPhase({phaseType:e.ROUND_ROBIN,name:"RR"})
+console.log(blocks,games)
+newGame(blocks[2][1])
+newBlock(phases[2])
+newGame(blocks[2][2])
+newBlock(phases[2])
+//Phase 1 Set links
 setLink(games[1][1][1], { index: 0, source: teams[1] })
 setLink(games[1][1][1], { index: 1, source: teams[2] })
 setLink(games[1][1][2], { index: 0, source: teams[3] })
@@ -99,14 +101,31 @@ setLink(games[1][1][2], { index: 1, source: teams[4] })
 
 setLink(games[1][2][1], { index: 0, source: games[1][1][1],sourceRank:1 })
 setLink(games[1][2][1], { index: 1, source: games[1][1][1],sourceRank:2 })
-setLink(games[1][2][2], { index: 0, source: games[1][1][2],sourceRank:1 })
+setLink(games[1][2][2], { index: 0, source: phases[2],sourceRank:1 })
 setLink(games[1][2][2], { index: 1, source: games[1][1][2],sourceRank:2 })
 
-setLink(games[1][3][1], { index: 0, source: games[1][2][1],sourceRank:1 })
-setLink(games[1][3][1], { index: 1, source: games[1][2][2],sourceRank:1 })
+// setLink(games[1][3][1], { index: 0, source: games[1][2][1],sourceRank:1 })
+// setLink(games[1][3][1], { index: 1, source: games[2][1][1],sourceRank:2 })
+//Phase 2 set links
+setLink(games[2][1][1], { index: 0, source: teams[5] })
+setLink(games[2][1][1], { index: 1, source: teams[6] })
+setLink(games[2][1][2], { index: 0, source: teams[7] })
+setLink(games[2][1][2], { index: 1, source: teams[8] })
 
-console.log(games)
+// setLink(games[2][2][1], { index: 0, source: games[2][1][1],sourceRank:1 })
+// setLink(games[2][2][1], { index: 1, source: games[2][1][1],sourceRank:2 })
+// setLink(games[2][2][2], { index: 0, source: games[1][1][2],sourceRank:1 })
+// setLink(games[2][2][2], { index: 1, source: games[1][1][2],sourceRank:2 })
+
+// setLink(games[2][3][1], { index: 0, source: games[1][2][1],sourceRank:1 })
+// setLink(games[2][3][1], { index: 1, source: games[1][2][2],sourceRank:1 })
+
+
 // s.scheduleAll();
 
 
-
+document.addEventListener("keydown",(ev)=>{
+    if(ev.key==="Control"){
+        console.log(document.querySelectorAll("body *:hover"))
+    }
+})

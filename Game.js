@@ -100,20 +100,17 @@ var Game = (function () {
 
             if (this.incomingLinks.length !== 2) failValidity("Two and only two incoming links must exist")
 
-            // let outgoingLinkRegister = new Map();
             this.outgoingLinks.forEach((outLink) => {
                 resetLinkTest();
-                // if (!outgoingLinkRegister.has(outLink.target.phase)) outgoingLinkRegister.set(outLink.target.phase, {});
-                // if (outgoingLinkRegister.get(outLink.target.phase)[outLink.sourceRank]) {
-                //     outLink.lodgeObjection(this);
-                //     outgoingLinkRegister.get(outLink.target.phase)[outLink.sourceRank].lodgeObjection(this);
-                //     failValidity("Each Game can only have one target per rank per phase");
-                // }
-                // outgoingLinkRegister.get(outLink.target.phase)[outLink.sourceRank] = outLink;
 
                 if (outLink.sourceRank > 2){ 
                     outLink.lodgeObjection(this);
                     failValidity("Only ranks 1 and 2 valid for Games");}
+
+                    if(this.phase.phaseType===e.ROUND_ROBIN){
+                        outLink.lodgeObjection(this);
+                        failValidity("Games inside a round robin cannot be a source.")
+                    }
 
                 if (linkTest()) outLink.revokeObjection(this);
             });
@@ -124,6 +121,10 @@ var Game = (function () {
                 if(inLink.source instanceof Team){
                     (incomingTeamRegister.has(inLink.source)) ? failValidity("Team cannot play itself")
                                                                 : incomingTeamRegister.add(inLink.source);
+                }
+                if(this.phase.phaseType===e.ROUND_ROBIN && inLink.source.phase===this.phase){
+                    inLink.lodgeObjection(this);
+                    failValidity("In a round robin, games cannot be dependant on outcome of other games in the same Phase.")
                 }
                 if (linkTest()) inLink.revokeObjection(this);
             });
@@ -138,8 +139,9 @@ var Game = (function () {
             })
 
             
-
-                let overlappingAncestorSources = sourceTrackBack(this).similarLinks;
+                let sourceTrackBackResults = sourceTrackBack(this)
+                let overlappingAncestorSources = sourceTrackBackResults.similarLinks;
+                if(sourceTrackBackResults.loopCreated) failValidity("A loop has been created")
                 if (overlappingAncestorSources.size>0) {
                     failValidity("Potential for same team to play itself. The same source appears with the same rank twice in this Game's past. ")
                 }

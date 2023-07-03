@@ -377,6 +377,8 @@ var TableGenerator = (function TableGeneratorBuilder(comp) {
                 phaseContainer.quickSave("Associated", newPhase);
                 bond(phaseContainer,newPhase);
                 phaseContainer.querySelector("input").value = newPhase.currentSettings.get(e.PRIORITY);
+                phaseContainer.prepend(document.createElement("br"));
+                phaseContainer.prepend(newPhase.phaseType.description)
                 CodeObserver.register(newPhase); 
                 CodeObserver.addHandler(newPhase, ({ mark }) => {
                     if (mark.validity.status) {
@@ -395,7 +397,7 @@ var TableGenerator = (function TableGeneratorBuilder(comp) {
             addAsElder: "table",
             htmlInsert: HtmlTemplates.addButton,
             addEvents: [EventTemplates.onButtonNew(this.phaseTemplate)],
-            addTemplates: [TableGenerator.phaseConstructor.controlPanel,this.phaseTemplate],
+            addTemplates: [TableGenerator.phaseConstructor.controlPanel],
             onCreationCode:(mainDiv)=>{
                 bond(mainDiv,comp);
             }

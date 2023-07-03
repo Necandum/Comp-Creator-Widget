@@ -7,9 +7,9 @@ function Break(msg,variablesObj){
     throw new Error(msg)
 }
 
-function Alert(msg,variableObj){
+function Alert(msg,variableObj,trace=true){
    console.log("Alert! Non-ideal behaviour.",msg,variableObj);
-   console.trace();
+   if(trace) console.trace();
    return null
 }
 function parseHTML(string) {

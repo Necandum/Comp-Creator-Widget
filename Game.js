@@ -4,94 +4,63 @@ var Game = (function () {
     function Game(parent) {
 
         let links = new Set();
-        let objectionableLinks = new Set();
-        let startingTeams = {};
-        let outcome = {
-            finalised: false,
-            ranking: new Map()
-        }
-
-        let validity = { status: false, message: "" };
+        let validity = new ValidityTracker();
+        let ancestralLinksRegistrar = new AncestorRegistry(this);
         let customGameStages = null;
         let myId = ++id;
         let thisGame = this;
         let associatedDivFlesh;
         defineGetter({ obj: this, name: "outgoingLinks", func: () => Array.from(links.keys()).filter((cv) => cv.source === this) });
         defineGetter({ obj: this, name: "incomingLinks", func: () => Array.from(links.keys()).filter((cv) => cv.target === this) });
+        defineGetter({ obj: this, name: "ancestralLinks", func: () => ancestralLinksRegistrar.ancestralLinks });
         defineGetter({ obj: this, name: "block", func: () => parent });
-        defineGetter({ obj: this, name: "parent", func: () => parent });
-        defineGetter({ obj: this, name: "gameOrder", func: () => parent.allGamesArray.indexOf(this)+1 });
-        defineGetter({ obj: this, name: "flesh", func: () => associatedDivFlesh });
-        defineSetter({ obj: this, name: "flesh", func: (mainDiv) => associatedDivFlesh=mainDiv });
-        defineGetter({ obj: this, name: "id", func: () => myId });
-        defineGetter({ obj: this, name: "validity", func: () => ({ ...validity }) });
-        defineGetter({ obj: this, name: "name", func: () => `Game ${myId}` });
         defineGetter({ obj: this, name: "phase", func: () => parent.parent });
+        defineGetter({ obj: this, name: "gameOrder", func: () => parent.allGamesArray.indexOf(this)+1 });
+        defineGetter({ obj: this, name: "id", func: () => myId });
+        defineGetter({ obj: this, name: "name", func: () => `Game ${myId}` });
+        defineGetter({ obj: this, name: "validity", func: () => ({ ...validity }) });
         defineGetter({
             obj: this, name: "gameStages", func: () => (customGameStages) ? customGameStages :
                 this.phase.currentSettings.get(e.GAME_STAGES)
         });
-        this.removeParent = function () {
-            let tempParent = parent;
-            parent = null;
-            if (tempParent.allGamesArray.indexOf(this) > -1) tempParent.removeGame(this); //links will need to destroyed and re-created 
-        }
-        this.addParent = function (newParent) {
-            if (newParent === parent) return this;
-            if (parent) parent.removeGame(this);
-            parent = newParent;
-            parent.addGame(this); //links will need to destroyed and re-created 
-        }
+
+        defineSetter({ obj: this, name: "flesh", func: (mainDiv) => associatedDivFlesh=mainDiv });
+        defineGetter({ obj: this, name: "flesh", func: () => associatedDivFlesh });
+      
         this.newIncomingLink = function ({ source, sourceRank }) {
             return new Link({ target: this, source, sourceRank });
         }
         this.newOutgoingLink = function ({ target, sourceRank }) {
             return new Link({ target, source: this, sourceRank });
         }
-        this.addLink = function addLink (link, doVerification = true) {
-            if (!(link instanceof Link)) throw new Error("Only Links can be so added. ");
-            if (link.source !== this && link.target !== this) throw new Error("Link does not relate to this game")
+        this.addLink = function addLink (link) {
+            if (!(link instanceof Link)) Break("Only Links can be so added. ",{link,this:this});
+            if (link.source !== this && link.target !== this) Break("Link does not relate to this game",{link,this:this})
+            Verification.queue(this);
             links.add(link);
-            if (doVerification) this.verifyLinks();
+            this.addAncestralLink(link);
+            this.block.addAncestralLink(link);
+            this.phase.addAncestralLink(link);
         }
-        this.removeLink = function (link,alsoVerify = true) {
+        this.addAncestralLink = function addAncestralLink(link){
+            Verification.queue(this);
+            if( ancestralLinksRegistrar.add(link)){
+                this.outgoingLinks.forEach(iLink =>iLink.target.addAncestralLink(link))
+               };
+        }
+        this.removeLink = function removeLink(link) {
             if (!(link instanceof Link)) throw new Error("Only Links can be so removed. ");
-            if (links.delete(link)) {
-                link.deleteLink(this);
-            }
-            if(alsoVerify){
-               // this.phase.verifyLinks();
-               // this.block.verifyLinks();
-                this.verifyLinks();
-            }
+            if (!link.forDeletion)  return link.deleteLink();
+            links.delete(link);
+            this.remakeAncestralRegister();
+            Verification.queue(this);
         }
-        this.registerDistantObjection = function registerDistantObjection(badLink) {
-            objectionableLinks.add(badLink);
-            badLink.lodgeObjection(this);
+
+        this.remakeAncestralRegister = function remakeAncestralRegister(){
+            Verification.queue(this)
+            this.incomingLinks.forEach(iLink=>this.addAncestralLink(iLink));
         }
-        this.liftDistantObjection = function liftDistantObjection(forgivenLink) {
-            objectionableLinks.delete(forgivenLink);
-            forgivenLink.revokeObjection(this)
-        }
-        this.checkAllDownstream= function checkAllDownstream(alreadyVisited = new Set()){
-            this.outgoingLinks.forEach((outLink)=>{
-                if(!alreadyVisited.has(outLink.target)){
-                    alreadyVisited.add(outLink.target);
-                    outLink.target.verifyLinks();
-                    outLink.target?.checkAllDownstream?.(alreadyVisited)
-                }
-            ;});
-           
-        }
-        this.checkAllUpstream = function checkAllUpstream(alreadyVisited = new Set()){
-            this.incomingLinks.forEach((inLink)=>{
-                if(!alreadyVisited.has(inLink.souce)){
-                    alreadyVisited.add(inLink.source);
-                    inLink.source.verifyLinks();
-                    inLink.source?.checkAllUpstream?.(alreadyVisited)
-                }
-            ;});
-        }
+        
         this.verifyLinks = function () {
             let testValidity = { status: true, message: "", thisLink: true };
             let failValidity = (msg) => { testValidity.status = false; testValidity.thisLink = false; testValidity.message += `\n -${msg}`; };

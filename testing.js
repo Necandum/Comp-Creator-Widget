@@ -124,8 +124,4 @@ setLink(games[2][1][2], { index: 1, source: teams[8] })
 // s.scheduleAll();
 
 
-document.addEventListener("keydown",(ev)=>{
-    if(ev.key==="Control"){
-        console.log(document.querySelectorAll("body *:hover"))
-    }
-})
+

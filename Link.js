@@ -25,11 +25,14 @@ var Link = (function () {
 
         this.deleteLink = function () {
             forDeletion=true;
+            source.removeLink(this);
+            target.removeLink(this);
+            Verification.activate();
         }
 
-        this.changeValidity = function(newValid){
-
-        }
+        source.addLink(this);
+        target.addLink(this);
+        Verification.activate();
         
 
     }

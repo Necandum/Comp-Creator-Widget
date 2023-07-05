@@ -1,11 +1,11 @@
 var AncestorRegistry = (function(){ 
 
     function AncestorRegistry(containingUnit){
+        this._containingUnit = containingUnit
         this._uniqueAncestorLinks = new Set();
         this._loopCreators = new Set();
         this._objections = [];
-        this._registrar = (containingUnit instanceof Game) ? new SourceRankRegistry(containingUnit) : new SeedRegistry(containingUnit);
-
+        this._registrar = new SourceRankRegistry(containingUnit);
     }   //importLink -> ancestor registry assess if it is new and it causes recursion. If its not new, that's weird, error. If no recursion, then each link in its ancestor registry
     //, assessed for newness and the new ones are passed to the registry maker. 
 
@@ -14,9 +14,9 @@ var AncestorRegistry = (function(){
             let sourceAncestorLinks = Array.from(link.source.ancestralLinks);
             sourceAncestorLinks.unshift(link);
             for(const ancestorLink of sourceAncestorLinks){
-                if(ancestorLink.source === containingUnit || ancestorLink.source === containingUnit.phase){
-                    this._loopCreator.add(ancestorLink);
-                    this._objections.push( new Objection(containingUnit,this._loopCreators,Objection.RecursiveLoop,containingUnit));
+                if(ancestorLink.source === this._containingUnit || ancestorLink.source === this._containingUnit.phase){
+                    this._loopCreators.add(ancestorLink);
+                    this._objections.push( new Objection(link.source,Array.from(this._loopCreators),Objection.RecursiveLoop,this._containingUnit));
                     return false;
                 }
                 if(this._uniqueAdd(ancestorLink)){
@@ -30,6 +30,7 @@ var AncestorRegistry = (function(){
                 return false;
             }else{
                 this._uniqueAncestorLinks.add(link);
+                console.log(this._containingUnit.name,"adding",link.source.name,"to",link.target.name)
                 return true;
             }
         },
@@ -40,9 +41,11 @@ var AncestorRegistry = (function(){
             this._registrar.wipe();
         }
     }
-    defineGetter({obj:AncestorRegistry.prototype,name:"objections",func:()=>[...this._objections,...this._registrar.obections]})
-    defineGetter({obj:AncestorRegistry.prototype,name:"registry",func:()=>this._registrar.registry}) 
-    defineGetter({obj:AncestorRegistry.prototype,name:"ancestralLinks",func:()=>new Set(this._uniqueAncestorLinks)}) 
+    defineGetter({obj:AncestorRegistry.prototype,name:"objections",func:function(){return [...this._objections,...this._registrar.objections]}})
+    defineGetter({obj:AncestorRegistry.prototype,name:"registry",func:function(){return this._registrar.registry}}) 
+    defineGetter({obj:AncestorRegistry.prototype,name:"registryManager",func:function(){return this._registrar}}) 
+    defineGetter({obj:AncestorRegistry.prototype,name:"ancestralLinks",func:function(){return new Set(this._uniqueAncestorLinks)}}) 
+    defineGetter({obj:AncestorRegistry.prototype,name:"insideALoop",func:function() {return (this._loopCreators.size>0) ? true:false}}) 
 
     AncestorRegistry.prototype.constructor=AncestorRegistry
 
@@ -54,16 +57,17 @@ var SourceRankRegistry = (function(){
     function SourceRankRegistry(containingUnit){
         this._objections = [];
         this._registry = new Map();
+        this._containingUnit = containingUnit
     }
 
     SourceRankRegistry.prototype = {
         add(link){
+            console.log("Before",this._containingUnit.name,this._registry,createEntryBySourceRank)
             let newEntry = createEntryBySourceRank(this._registry,link);
-            let newObjection = false;
-            if (newEntry["rankGroup"].length > 1){
-               newObjection = new Objection(newEntry["source"],newEntry["rankGroup"],Objection.SourceRankDuplication,containingUnit);
+            // console.log("After",newEntry,link,this._containingUnit.name,this._registry);
+            if (newEntry["sourceRankGroup"].length > 1){
+               this._objections.push(new Objection(newEntry["source"],newEntry["sourceRankGroup"],Objection.SourceRankDuplication,this._containingUnit));
             }
-            return newObjection;
         },
         wipe(){
             this._objections.forEach(objection => objection.revoke());
@@ -71,33 +75,77 @@ var SourceRankRegistry = (function(){
             this._registry.clear();
         },
     }
-    defineGetter({obj:SourceRankRegistry.prototype,name:"objections",func:()=>[...this._objections]})
-    defineGetter({obj:SourceRankRegistry.prototype,name:"registry",func:()=>this._registry}) //change to provide copy in future. 
+    defineGetter({obj:SourceRankRegistry.prototype,name:"objections",func:function(){return [...this._objections]}})
+    defineGetter({obj:SourceRankRegistry.prototype,name:"registry",func:function(){return this._registry}}) //change to provide copy in future. 
 
     SourceRankRegistry.prototype.constructor = SourceRankRegistry;
 
 return SourceRankRegistry
 })()
 
- 
+var UniqueSeedList = (function(){ 
+
+    function UniqueSeedList(containingUnit){
+        this._uniqueSeedArray =[];
+        this._objections = [];
+        this._containingUnit = containingUnit
+    }
+
+    UniqueSeedList.prototype={
+         add(link){
+            let linkShouldBeAddedToAncestorList = false;
+
+            if(!Number.isInteger(link.seed)) { // must have seed
+                this._objections.push(new Objection(this._containingUnit,[link],Objection.MustHaveSeed,this._containingUnit))
+            }
+
+            if(!this._uniqueSeedArray[link.seed]){
+                this._uniqueSeedArray[link.seed] = link;
+                linkShouldBeAddedToAncestorList = true;
+            }
+
+            for(const protoLink of this._uniqueSeedArray){
+                if(link.source===protoLink.source && link.sourceRank=== protoLink.sourceRank && !link.seed!==protoLink.seed){
+                    this._objections.push(new Objection(link.source,[link,protoLink],Objection.RedundantSeeds,this._containingUnit));
+                }
+                if(link.seed===protoLink.seed && (link.source!==protoLink.source || link.sourceRank!== protoLink.sourceRank )){
+                    this._objections.push(new Objection(link.source,[link,protoLink],Objection.OverLoadedSeed))
+                }
+            }
+          return linkShouldBeAddedToAncestorList;
+        },
+        wipe(){
+            this._objections.forEach(objection => objection.revoke());
+            this._objections=[];
+            this._uniqueSeedArray =[];
+        }
+    }
+    defineGetter({obj:UniqueSeedList.prototype,name:"objections",func:function(){return [...this._objections]}})
+    defineGetter({obj:UniqueSeedList.prototype,name:"uniqueSeedArray",func:function() {return [...this._uniqueSeedArray]}}) 
+    UniqueSeedList.prototype.constructor=UniqueSeedList
+
+return UniqueSeedList
+})()
+
 function createEntryBySourceRank(registry,link){
     if(!(registry instanceof Map) || !(link instanceof Link)) Break("registry must be a Map, link must be a Link",{registry,link});
-
-    let newEntry = EntryCreator(["source","rank"],Array)(registry,link);
+        console.log("Inside entrycreator, before",registry);
+    let newEntry = EntryCreator(["source","sourceRank"],Array)(registry,link);
+    console.log("Inside entrycreator, after",registry);
+    Break("WTF")
         newEntry["cap"].push(link);
     return newEntry;
 }
 
 function createEntryBySourceRankSeed(registry,link){
     if(!(registry instanceof Map) || !(link instanceof Link)) Break("registry must be a Map, link must be a Link",{registry,link});
-   
-    let newEntry = EntryCreator(["source","rank","seed"],Array)(registry,link);
+    let newEntry = EntryCreator(["source","sourceRank","seed"],Array)(registry,link);
         newEntry["cap"].push(link)
-    return {newEntry}
+    return newEntry;
 }
 
 function EntryCreator(propList,capConstructor){
-    return function(baseMap,newItem){
+    return function makingEntry(baseMap,newItem){
         if(!(baseMap instanceof Map)) Break("baseMap must be a Map",{baseMap,newItem});
 
         let returnObj ={}
@@ -110,7 +158,7 @@ function EntryCreator(propList,capConstructor){
             returnObj[`${prop}Group`] = previousStep;
         }
         let finalProp = propList.at(-1);
-        if(!previousStep.has(newItem[finalProp])) previousStep.set(newItem[finalProp], new capConstructor)
+        if(!previousStep.has(newItem[finalProp])) previousStep.set(newItem[finalProp], new capConstructor())
         returnObj[finalProp] = newItem[finalProp];
         returnObj[`${finalProp}Group`] = previousStep.get(newItem[finalProp]);
         returnObj["cap"] = returnObj[`${finalProp}Group`];
@@ -124,53 +172,5 @@ function createEntryBySourceRank(registry,link){
         newEntry["cap"].push(link);
     return newEntry;
 }
-function SeedRegistry(linksArr =[]) {
-    let registry = new Map();
-    let seedReference = [];
-    let noSeeds = new Set();
-    let duplicateReference = new Set() //same source, different seeds
-    let doublingUpOnSeed = new Set() // different sources, same seed
-    let uniqueSeedArray =[];
 
-    this.make = function makeSourceRegistryBySeed(){
-    for(const link of linksArr){
-       addLink(link);
-    }
-    uniqueSeedArray=[];
-    seedReference.forEach((liArr)=>{
-        if(liArr) uniqueSeedArray.push(liArr[0])
-    });
-        this.make =()=>({registry,seedReference,noSeeds,duplicateReference,doublingUpOnSeed,uniqueSeedArray})
-        return  this.make();
-    }
 
-    function addLink(link){
-       
-        if(!Number.isInteger(link.seed)) { // must have seed
-            noSeeds.add(link);
-            return;
-        }
-        
-        if (!registry.has(link.source)) registry.set(link.source, new Map())
-        let linkRegistration = registry.get(link.source);
-        if (!linkRegistration.has(link.sourceRank)) linkRegistration.set(link.sourceRank,new Map());
-        let rankGroup = linkRegistration.get(link.sourceRank)
-
-        if(!rankGroup.has(link.seed)) rankGroup.set(link.seed,{seedNumber:link.seed,linkList:[]})
-        let seedGroup = rankGroup.get(link.seed);
-        seedGroup.linkList.push(link)
-        
-        if(!seedReference[link.seed]) seedReference[link.seed] = [];
-        seedReference[link.seed].push(link);
-
-            let protoSeed = seedReference[link.seed][0]; //implies links from different sources have been assigned same seed
-            if((link.source !== protoSeed.source) || (link.sourceRank !== protoSeed.sourceRank)){
-                seedReference[link.seed].forEach(iLink=>doublingUpOnSeed.add(iLink));
-            }
-            if(rankGroup.size>1){ //implies two links with same source and rank, but different seeds
-                for(const iSeedGroup of rankGroup.values()){
-                    iSeedGroup.linkList.forEach((iLink)=>duplicateReference.add(iLink))
-                }
-            }
-    }
-}

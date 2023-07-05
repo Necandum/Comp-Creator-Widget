@@ -327,7 +327,7 @@ var TableGenerator = (function TableGeneratorBuilder(comp) {
                 bond(gameContainer,newGame)
                 CodeObserver.register(newGame); 
                 CodeObserver.addHandler(newGame, ({ mark }) => {
-                    if (mark.validity.status) {
+                    if (mark.validity.status===true) {
                         gameContainer.classList.remove("invalid")
                     }
                     else {

@@ -4,7 +4,7 @@ var Game = (function () {
     function Game(parent) {
 
         let links = new Set();
-        let validity = new ValidityTracker();
+        let validity = new ValidityTracker(false);
         let ancestralLinksRegistrar = new AncestorRegistry(this);
         let customGameStages = null;
         let myId = ++id;
@@ -18,7 +18,7 @@ var Game = (function () {
         defineGetter({ obj: this, name: "gameOrder", func: () => parent.allGamesArray.indexOf(this)+1 });
         defineGetter({ obj: this, name: "id", func: () => myId });
         defineGetter({ obj: this, name: "name", func: () => `Game ${myId}` });
-        defineGetter({ obj: this, name: "validity", func: () => ({ ...validity }) });
+        defineGetter({ obj: this, name: "validity", func: () => validity.copy()});
         defineGetter({
             obj: this, name: "gameStages", func: () => (customGameStages) ? customGameStages :
                 this.phase.currentSettings.get(e.GAME_STAGES)
@@ -38,106 +38,78 @@ var Game = (function () {
             if (link.source !== this && link.target !== this) Break("Link does not relate to this game",{link,this:this})
             Verification.queue(this);
             links.add(link);
-            this.addAncestralLink(link);
-            this.block.addAncestralLink(link);
-            this.phase.addAncestralLink(link);
+            if(link.target===this) this.addAncestralLink(link);
+            return true
         }
-        this.addAncestralLink = function addAncestralLink(link){
+        this.addAncestralLink = function addAncestralLink(link,propagation=true){
             Verification.queue(this);
-            if( ancestralLinksRegistrar.add(link)){
+            if( ancestralLinksRegistrar.add(link) && propagation){
                 this.outgoingLinks.forEach(iLink =>iLink.target.addAncestralLink(link))
+                this.block.addAncestralLink(link);
+                this.phase.addAncestralLink(link);
                };
         }
         this.removeLink = function removeLink(link) {
-            if (!(link instanceof Link)) throw new Error("Only Links can be so removed. ");
+            if (!(link instanceof Link)) Break("Only Links can be so removed. ",{link});
             if (!link.forDeletion)  return link.deleteLink();
-            links.delete(link);
-            this.remakeAncestralRegister();
             Verification.queue(this);
+            links.delete(link);
+            if(link.target===this) {
+                this.remakeAncestralRegister(link);
+            }
         }
-
-        this.remakeAncestralRegister = function remakeAncestralRegister(){
+        this.remakeAncestralRegister = function remakeAncestralRegister(originatingLink){
             Verification.queue(this)
-            this.incomingLinks.forEach(iLink=>this.addAncestralLink(iLink));
+            this.ancestralLinksRegistrar.wipe();
+            this.incomingLinks.forEach(iLink=>this.addAncestralLink(iLink,false));
+            if(ancestralLinksRegistrar.insideALoop) {
+                return false;}
+            else {
+                PostponeMakingAncestralLinks.queue(this.block,this.phase);
+                this.outgoingLinks.forEach(iLink=>iLink.target.remakeAncestralRegister(originatingLink));
+            }
+            return true; //will need to add conditions so that the cascade only passes on once all parents that could cause the cascade have cascaded. 
         }
         
         this.verifyLinks = function () {
-            let testValidity = { status: true, message: "", thisLink: true };
-            let failValidity = (msg) => { testValidity.status = false; testValidity.thisLink = false; testValidity.message += `\n -${msg}`; };
-            let resetLinkTest = () => testValidity.thisLink = true;
-            let linkTest = () => testValidity.thisLink;
+            let testValidity = new ValidityTracker(true);
+            Verification.revokeAllObjections(this);
+            let objections =  ancestralLinksRegistrar.objections
+            if(objections.length>0){ 
+                testValidity.fail(Objection.SourceRankDuplication)
+                objections.forEach(objection=>objection.lodge())
+            }
 
-            if (this.incomingLinks.length !== 2) failValidity("Two and only two incoming links must exist")
+            if (this.incomingLinks.length !== 2) testValidity.fail(Objection.TwoTeamGame);
 
             this.outgoingLinks.forEach((outLink) => {
-                resetLinkTest();
-
                 if (outLink.sourceRank > 2){ 
-                    outLink.lodgeObjection(this);
-                    failValidity("Only ranks 1 and 2 valid for Games");}
+                    new Objection(outLink.target,[outLink],Objection.GameOnlyTwoRanks,this)
+                    testValidity.fail(Objection.GameOnlyTwoRanks);
+                }
 
-                    if(this.phase.phaseType===e.ROUND_ROBIN){
-                        outLink.lodgeObjection(this);
-                        failValidity("Games inside a round robin cannot be a source.")
-                    }
-
-                if (linkTest()) outLink.revokeObjection(this);
+                if(this.phase.phaseType===e.ROUND_ROBIN){
+                    new Objection(outLink.target,[outLink],Objection.RoundRobinGameAsSource,this)
+                    testValidity.fail(Objection.RoundRobinGameAsSource)
+                }
             });
 
-            let incomingTeamRegister = new Set();
             this.incomingLinks.forEach((inLink) => {
-                resetLinkTest()
-                if(inLink.source instanceof Team){
-                    (incomingTeamRegister.has(inLink.source)) ? failValidity("Team cannot play itself")
-                                                                : incomingTeamRegister.add(inLink.source);
-                }
+                
                 if(this.phase.phaseType===e.ROUND_ROBIN && inLink.source.phase===this.phase){
-                    inLink.lodgeObjection(this);
-                    failValidity("In a round robin, games cannot be dependant on outcome of other games in the same Phase.")
+                    new Objection(inLink.source,[inLink],Objection.NotATournament,this)
+                    testValidity.fail(Objection.NotATournament)
                 }
-                if (linkTest()) inLink.revokeObjection(this);
             });
 
-            links.forEach((link) => {
-                let linkObjectors = link.objectors
-                if (linkObjectors.size > 0) {
-                    for (objector of linkObjectors) {
-                        if (objector !== this) failValidity(`${objector.name} objects to relationship between ${link.source.name} and ${link.target.name}`)
-                    }
-                }
-            })
-
+            console.log("Verified",this.name,testValidity,ancestralLinksRegistrar)
             
-                let sourceTrackBackResults = sourceTrackBack(this)
-                let overlappingAncestorSources = sourceTrackBackResults.similarLinks;
-                if(sourceTrackBackResults.loopCreated) failValidity("A loop has been created")
-                if (overlappingAncestorSources.size>0) {
-                    failValidity("Potential for same team to play itself. The same source appears with the same rank twice in this Game's past. ")
-                }
-                let unionSet = new Set([...objectionableLinks,...overlappingAncestorSources]);
-
-                for(const link of unionSet){
-                    if(!objectionableLinks.has(link) && overlappingAncestorSources.has(link)){
-                        this.registerDistantObjection(link);
-                    } else if (objectionableLinks.has(link) && !overlappingAncestorSources.has(link)){
-                        this.liftDistantObjection(link);
-                    }
-                }
-
             if (validity.status !== testValidity.status || validity.message !== testValidity.message) changeValidity(testValidity);
             return testValidity
-
         }
 
         function changeValidity(newValidity) {
-            let outgoingNeedCheck = (newValidity.status === true && validity.status ===false)
             validity = newValidity;
-            if(outgoingNeedCheck) {
-                thisGame.checkAllDownstream();
-                thisGame.checkAllUpstream();
-                thisGame.phase.checkAllDownstream();
-                thisGame.phase.checkAllUpstream();
-            }
             CodeObserver.Execution({ mark: thisGame, currentFunction: changeValidity, currentObject: thisGame })
         }
     }

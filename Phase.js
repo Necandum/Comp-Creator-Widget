@@ -15,8 +15,7 @@ var Phase = (function () {
         let divisions = [];
         let links = new Set();
         let validity = new ValidityTracker(true);
-        let ancestralLinksRegistrar = new AncestorRegistry(this);
-        let seedList = new UniqueSeedList(this);
+        let ancestralLinksRegistrar = new AncestorRegistry(this,{selectedRegistrar:UniqueSourceRankRegistry});
         let thisPhase = this;
         let associatedDivFlesh;
         phaseType = (phaseType===e.ROUND_ROBIN || phaseType===e.TOURNAMENT) ? phaseType: e.ROUND_ROBIN;
@@ -37,34 +36,18 @@ var Phase = (function () {
         defineGetter({ obj: this, name: "allBlocksArray", func: () => Array.from(blocks) });
         defineGetter({ obj: this, name: "allGamesInPhase", func: () => blocks.reduce((acc, cv) => { acc.push(...cv.allGamesArray); return acc }, []) });
         defineGetter({ obj: this, name: "outgoingLinks", func: () => Array.from(links.keys()).filter((cv) => cv.source === this) });
-        defineGetter({ obj: this, name: "incomingLinks", func: () => seedList.uniqueSeedArray.filter(x=>Boolean(x))});
         defineGetter({ obj: this, name: "allIncomingLinks", func: () => this.allBlocksArray.reduce((acc,block)=>{acc.push(...block.incomingLinks);return acc;},[])});
-        defineGetter({ obj: this, name: "ancestralLinks", func: () => ancestralLinksRegistrar.ancestralLinks});
-        defineGetter({ obj: this, name: "nextSeedNumber", func: () => getIncomingLinkRegistry().seedReference.length});
+        defineGetter({ obj: this, name: "ancestralLinks", func: () => ancestralLinksRegistrar.registryManager.uniqueArray});
         defineGetter({ obj: this, name: "validity", func: () => validity.copy()});
         defineGetter({ obj: this, name: "phaseType", func: () => phaseType});
         defineGetter({ obj: this, name: "flesh", func: () => associatedDivFlesh });
         defineSetter({ obj: this, name: "flesh", func: (mainDiv) => associatedDivFlesh=mainDiv });
 
-        this.deriveCorrectSeed = function(link){
-            let seed = false;
-            for(const protoLink of seedList.uniqueSeedArray){
-                if(!protoLink) continue
-                if(link.source===protoLink.source && link.sourceRank === protoLink.sourceRank){
-                    seed = protoLink.seed;
-                }
-            }
-            if(!seed){
-                seed = (seedList.uniqueSeedArray.length===0) ? 1 : seedList.uniqueSeedArray.length; //the first seed will be added at index 1, thus making the array length 2. The 0 index is never used by seeds
-            }
-            return seed
-        }
         this.newBlock = function (newBlockName) {
             let newBlock = new Block({ parent: this, name: newBlockName })
             blocks.push(newBlock);
             return newBlock;
         }
-
         this.addLink = function addLink (link) {
             if (!(link instanceof Link)) throw new Error("Only Links can be so added.");
             if (link.target === this) Break("Links cannot target Phases directly",{link,this:this})
@@ -72,18 +55,13 @@ var Phase = (function () {
             Verification.queue(this);
         }
         this.addAncestralLink = function addAncestralLink(link,propagation=true){
-            if(phaseType===e.TOURNAMENT) {
-                seedList.add(link);
-                return true;
-            }
+            if(phaseType===e.TOURNAMENT) return true;
             if(link.source.phase===this) return true;
             Verification.queue(this);
-            let isNewSeed = seedList.add(link)
-            if(isNewSeed){
-                if( ancestralLinksRegistrar.add(link) && propagation){
-                    this.outgoingLinks.forEach(iLink =>iLink.target.addAncestralLink(link))
+                if(ancestralLinksRegistrar.add(link) && propagation){
+                    this.outgoingLinks.forEach(iLink =>iLink.target.addAncestralLink(iLink)) //makes it re-add all the ancestral links of this phase, which is the unique list. 
                     };
-            }
+            
             
         }
         this.removeLink = function (link) {
@@ -92,22 +70,10 @@ var Phase = (function () {
             Verification.queue(this);
             links.delete(link);
         }
-        let countParentsThatWillCascade=false;
         this.remakeAncestralRegister = function remakeAncestralRegister(originatingLink){
             if(phaseType===e.TOURNAMENT) return true;
             Verification.queue(this)
-            if(countParentsThatWillCascade===false){
-                countParentsThatWillCascade = 0;
-                this.incomingLinks.forEach(inLink => {
-                    if(inLink.source.ancestralLinks.has(originatingLink)) countParentsThatWillCascade++
-                })
-            } else {
-                countParentsThatWillCascade--
-            }
-            if(countParentsThatWillCascade<=0){
-                
                 ancestralLinksRegistrar.wipe();
-                seedList.wipe();
                 for(const inLink of this.allIncomingLinks){
                         this.addAncestralLink(inLink,false)
                 }
@@ -117,7 +83,6 @@ var Phase = (function () {
                     this.outgoingLinks.forEach(iLink=>iLink.target.remakeAncestralRegister(originatingLink)) //only games
                 }
                 return true;
-            }      
         }
 
         this.verifyLinks = function () {
@@ -125,12 +90,12 @@ var Phase = (function () {
 
             let testValidity = new ValidityTracker(true);
             Verification.revokeAllObjections(this);
-            let objections =  [...ancestralLinksRegistrar.objections,...seedList.objections]
+            let objections =  [...ancestralLinksRegistrar.objections]
                 if(objections.length>0){ 
                     objections.forEach(objection=>{objection.lodge();testValidity.fail(objection.reason)})
                 }
 
-            let maxPossibleTeams=seedList.uniqueSeedArray.length-1; //array is 1 indexed
+            let maxPossibleTeams=this.ancestralLinks.length; //array is 1 indexed
                 this.outgoingLinks.forEach((outLink) => {
                 if(outLink.sourceRank > maxPossibleTeams) {
                     new Objection(outLink.target,[outLink],Objection.NotEnoughTeams,this)

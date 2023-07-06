@@ -1,11 +1,11 @@
 var AncestorRegistry = (function(){ 
 
-    function AncestorRegistry(containingUnit){
+    function AncestorRegistry(containingUnit,{selectedRegistrar}={}){
         this._containingUnit = containingUnit
         this._uniqueAncestorLinks = new Set();
         this._loopCreators = new Set();
         this._objections = [];
-        this._registrar = new SourceRankRegistry(containingUnit);
+        this._registrar = (selectedRegistrar) ? new selectedRegistrar(containingUnit): new SourceRankRegistry(containingUnit);
     }   //importLink -> ancestor registry assess if it is new and it causes recursion. If its not new, that's weird, error. If no recursion, then each link in its ancestor registry
     //, assessed for newness and the new ones are passed to the registry maker. 
 
@@ -37,6 +37,7 @@ var AncestorRegistry = (function(){
             this._uniqueAncestorLinks = new Set();
             this._loopCreators = new Set();
             this._objections.forEach(objection => objection.revoke())
+            this._objections =[];
             this._registrar.wipe();
         }
     }
@@ -80,50 +81,36 @@ var SourceRankRegistry = (function(){
 return SourceRankRegistry
 })()
 
-var UniqueSeedList = (function(){ 
+var UniqueSourceRankRegistry = (function(){ 
 
-    function UniqueSeedList(containingUnit){
-        this._uniqueSeedArray =[];
-        this._objections = [];
+    function uniqueSourceRankRegistry(containingUnit){
+        this._registry = new Map();
+        this._uniqueSourceRankRegistry = new Set();
         this._containingUnit = containingUnit
     }
 
-    UniqueSeedList.prototype={
-         add(link){
-            let linkShouldBeAddedToAncestorList = false;
-
-            if(!Number.isInteger(link.seed)) { // must have seed
-                this._objections.push(new Objection(this._containingUnit,[link],Objection.MustHaveSeed,this._containingUnit))
+    uniqueSourceRankRegistry.prototype = {
+        add(link){
+            let newEntry = createEntryBySourceRank(this._registry,link);
+            if (newEntry["sourceRankGroup"].length===1){
+               this._uniqueSourceRankRegistry.add(link);    
             }
-
-            if(!this._uniqueSeedArray[link.seed]){
-                this._uniqueSeedArray[link.seed] = link;
-                linkShouldBeAddedToAncestorList = true;
-            }
-
-            for(const protoLink of this._uniqueSeedArray){
-                if(!protoLink) continue;
-                if(link.source===protoLink.source && link.sourceRank=== protoLink.sourceRank && link.seed!==protoLink.seed){
-                    this._objections.push(new Objection(link.source,[link,protoLink],Objection.RedundantSeeds,this._containingUnit));
-                }
-                if(link.seed===protoLink.seed && (link.source !==protoLink.source || link.sourceRank !== protoLink.sourceRank )){
-                    this._objections.push(new Objection(link.source,[link,protoLink],Objection.OverLoadedSeed,this._containingUnit))
-                }
-            }
-          return linkShouldBeAddedToAncestorList;
         },
         wipe(){
-            this._objections.forEach(objection => objection.revoke());
-            this._objections=[];
-            this._uniqueSeedArray =[];
-        }
+            this._registry.clear();
+            this._uniqueSourceRankRegistry.clear()
+        },
     }
-    defineGetter({obj:UniqueSeedList.prototype,name:"objections",func:function(){return [...this._objections]}})
-    defineGetter({obj:UniqueSeedList.prototype,name:"uniqueSeedArray",func:function() {return [...this._uniqueSeedArray]}}) 
-    UniqueSeedList.prototype.constructor=UniqueSeedList
+    defineGetter({obj:uniqueSourceRankRegistry.prototype,name:"uniqueArray",func:function(){return new Set(this._uniqueSourceRankRegistry)}}) //change to provide copy in future. 
+    defineGetter({obj:uniqueSourceRankRegistry.prototype,name:"objections",func:function(){return []}})
+    uniqueSourceRankRegistry.prototype.constructor = uniqueSourceRankRegistry;
 
-return UniqueSeedList
+return uniqueSourceRankRegistry
 })()
+
+
+
+
 function createEntryBySourceRank(registry,link){
     if(!(registry instanceof Map) || !(link instanceof Link)) Break("registry must be a Map, link must be a Link",{registry,link});
     let newEntry = EntryCreator(["source","sourceRank"],Array)(registry,link);
@@ -161,4 +148,48 @@ function EntryCreator(propList,capConstructor){
 }
 
 
+// Depreciated
+// var UniqueSeedList = (function(){ 
 
+//     function UniqueSeedList(containingUnit){
+//         this._uniqueSeedArray =[];
+//         this._objections = [];
+//         this._containingUnit = containingUnit
+//     }
+
+//     UniqueSeedList.prototype={
+//          add(link){
+//             let linkShouldBeAddedToAncestorList = false;
+
+//             if(!Number.isInteger(link.seed)) { // must have seed
+//                 this._objections.push(new Objection(this._containingUnit,[link],Objection.MustHaveSeed,this._containingUnit))
+//             }
+
+//             if(!this._uniqueSeedArray[link.seed]){
+//                 this._uniqueSeedArray[link.seed] = link;
+//                 linkShouldBeAddedToAncestorList = true;
+//             }
+
+//             for(const protoLink of this._uniqueSeedArray){
+//                 if(!protoLink) continue;
+//                 if(link.source===protoLink.source && link.sourceRank=== protoLink.sourceRank && link.seed!==protoLink.seed){
+//                     this._objections.push(new Objection(link.source,[link,protoLink],Objection.RedundantSeeds,this._containingUnit));
+//                 }
+//                 if(link.seed===protoLink.seed && (link.source !==protoLink.source || link.sourceRank !== protoLink.sourceRank )){
+//                     this._objections.push(new Objection(link.source,[link,protoLink],Objection.OverLoadedSeed,this._containingUnit))
+//                 }
+//             }
+//           return linkShouldBeAddedToAncestorList;
+//         },
+//         wipe(){
+//             this._objections.forEach(objection => objection.revoke());
+//             this._objections=[];
+//             this._uniqueSeedArray =[];
+//         }
+//     }
+//     defineGetter({obj:UniqueSeedList.prototype,name:"objections",func:function(){return [...this._objections]}})
+//     defineGetter({obj:UniqueSeedList.prototype,name:"uniqueSeedArray",func:function() {return [...this._uniqueSeedArray]}}) 
+//     UniqueSeedList.prototype.constructor=UniqueSeedList
+
+// return UniqueSeedList
+// })()

@@ -9,7 +9,6 @@ var Link = (function () {
         defineGetter({ obj: this, name: "source", func: () => source })
         defineGetter({ obj: this, name: "target", func: () => target })
         defineGetter({ obj: this, name: "sourceRank", func: () => sourceRank })
-        defineGetter({ obj: this, name: "seed", func: () => seed })
         defineGetter({ obj: this, name: "forDeletion", func: () => forDeletion })
         defineGetter({ obj: this, name: "valid", func: () => validity.status })
 

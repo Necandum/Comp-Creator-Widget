@@ -89,8 +89,7 @@ var Game = (function () {
             Verification.revokeAllObjections(this);
             let objections =  ancestralLinksRegistrar.objections
             if(objections.length>0){ 
-                testValidity.fail(Objection.SourceRankDuplication)
-                objections.forEach(objection=>objection.lodge())
+                objections.forEach(objection=>{objection.lodge();testValidity.fail(objection.reason)})
             }
 
             if (this.incomingLinks.length !== 2) testValidity.fail(Objection.TwoTeamGame);
@@ -104,7 +103,7 @@ var Game = (function () {
 
             this.incomingLinks.forEach((inLink) => {
                 
-                if(inLink.source?.phase?.phaseType===e.ROUND_ROBIN){
+                if(inLink.source?.phase?.phaseType===e.ROUND_ROBIN && inLink.source instanceof Game){
                     new Objection(this,[inLink],Objection.RoundRobinGameAsSource,this)
                     testValidity.fail(Objection.RoundRobinGameAsSource)
                 }

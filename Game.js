@@ -58,17 +58,30 @@ var Game = (function () {
                 this.remakeAncestralRegister(link);
             }
         }
+        let countParentsThatWillCascade=false;
         this.remakeAncestralRegister = function remakeAncestralRegister(originatingLink){
             Verification.queue(this)
-            this.ancestralLinksRegistrar.wipe();
-            this.incomingLinks.forEach(iLink=>this.addAncestralLink(iLink,false));
-            if(ancestralLinksRegistrar.insideALoop) {
-                return false;}
-            else {
-                PostponeMakingAncestralLinks.queue(this.block,this.phase);
-                this.outgoingLinks.forEach(iLink=>iLink.target.remakeAncestralRegister(originatingLink));
+            if(countParentsThatWillCascade===false){
+                countParentsThatWillCascade = 0;
+                this.incomingLinks.forEach(inLink => {
+                    if(inLink.source.ancestralLinks.has(originatingLink)) countParentsThatWillCascade++
+                })
+            } else {
+                countParentsThatWillCascade--
             }
-            return true; //will need to add conditions so that the cascade only passes on once all parents that could cause the cascade have cascaded. 
+            if(countParentsThatWillCascade<=0){
+                countParentsThatWillCascade=false;
+                ancestralLinksRegistrar.wipe();
+                this.incomingLinks.forEach(iLink=>this.addAncestralLink(iLink,false));
+                if(ancestralLinksRegistrar.insideALoop) {
+                    return false;
+                }
+                else {
+                    PostponeMakingAncestralLinks.queue(this.block,this.phase);
+                    this.outgoingLinks.forEach(iLink=>iLink.target.remakeAncestralRegister(originatingLink));
+                }
+                return true; 
+           } 
         }
         
         this.verifyLinks = function () {
@@ -87,23 +100,16 @@ var Game = (function () {
                     new Objection(outLink.target,[outLink],Objection.GameOnlyTwoRanks,this)
                     testValidity.fail(Objection.GameOnlyTwoRanks);
                 }
-
-                if(this.phase.phaseType===e.ROUND_ROBIN){
-                    new Objection(outLink.target,[outLink],Objection.RoundRobinGameAsSource,this)
-                    testValidity.fail(Objection.RoundRobinGameAsSource)
-                }
             });
 
             this.incomingLinks.forEach((inLink) => {
                 
-                if(this.phase.phaseType===e.ROUND_ROBIN && inLink.source.phase===this.phase){
-                    new Objection(inLink.source,[inLink],Objection.NotATournament,this)
-                    testValidity.fail(Objection.NotATournament)
+                if(inLink.source?.phase?.phaseType===e.ROUND_ROBIN){
+                    new Objection(this,[inLink],Objection.RoundRobinGameAsSource,this)
+                    testValidity.fail(Objection.RoundRobinGameAsSource)
                 }
             });
 
-            console.log("Verified",this.name,testValidity,ancestralLinksRegistrar)
-            
             if (validity.status !== testValidity.status || validity.message !== testValidity.message) changeValidity(testValidity);
             return testValidity
         }

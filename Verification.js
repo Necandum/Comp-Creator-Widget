@@ -2,7 +2,8 @@
 
 
 var Verification = (function(){ 
-
+    let paused = false;
+    let activatedWhilePaused = false;
     let Verification = {
         objections: new Set(),
         forVerification: new Set(),
@@ -16,12 +17,36 @@ var Verification = (function(){
             this.forVerification.add(unit);
         },
         activate(){
-            this.forVerification.forEach(unit=>unit.verifyLinks())
-            this.forVerification.clear();
+            if(!paused){
+                this.forVerification.forEach(unit=>unit.verifyLinks())
+                this.forVerification.clear();
+                console.log("~~~~~~~~~~~")
+            } else {
+                activatedWhilePaused = true;
+            }
         },
         revokeAllObjections(unit){
             this.objections.forEach(objection=> (objection.objector===unit) ? this.objections.delete(objection): false)
         },
+        pause(){
+            if(!paused){
+                paused =true;
+                activatedWhilePaused = false;
+                return true;
+            } else{
+                return false;
+            }
+        },
+        unPause(){
+            if(paused){
+                paused = false;
+                if(activatedWhilePaused) this.activate();
+                activatedWhilePaused = false;
+                return true;
+            } else {
+                return false;
+            }
+        }
         
     }
 
@@ -44,8 +69,8 @@ var PostponeMakingAncestralLinks = (function(){
         }
         },
         activate(){
-            this.phases.forEach(phase=>phase.remakeAncestralLinks())
-            this.blocks.forEach(block=>block.remakeAncestralLinks())
+            this.phases.forEach(phase=>phase.remakeAncestralRegister())
+            this.blocks.forEach(block=>block.remakeAncestralRegister())
         }
         
         

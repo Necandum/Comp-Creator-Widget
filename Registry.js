@@ -20,7 +20,7 @@ var AncestorRegistry = (function(){
                     return false;
                 }
                 if(this._uniqueAdd(ancestorLink)){
-                   this._registrar.add(link);
+                   this._registrar.add(ancestorLink);
                 }
             }
             return true;
@@ -30,7 +30,6 @@ var AncestorRegistry = (function(){
                 return false;
             }else{
                 this._uniqueAncestorLinks.add(link);
-                console.log(this._containingUnit.name,"adding",link.source.name,"to",link.target.name)
                 return true;
             }
         },
@@ -62,9 +61,7 @@ var SourceRankRegistry = (function(){
 
     SourceRankRegistry.prototype = {
         add(link){
-            console.log("Before",this._containingUnit.name,this._registry,createEntryBySourceRank)
             let newEntry = createEntryBySourceRank(this._registry,link);
-            // console.log("After",newEntry,link,this._containingUnit.name,this._registry);
             if (newEntry["sourceRankGroup"].length > 1){
                this._objections.push(new Objection(newEntry["source"],newEntry["sourceRankGroup"],Objection.SourceRankDuplication,this._containingUnit));
             }
@@ -105,11 +102,12 @@ var UniqueSeedList = (function(){
             }
 
             for(const protoLink of this._uniqueSeedArray){
-                if(link.source===protoLink.source && link.sourceRank=== protoLink.sourceRank && !link.seed!==protoLink.seed){
+                if(!protoLink) continue;
+                if(link.source===protoLink.source && link.sourceRank=== protoLink.sourceRank && link.seed!==protoLink.seed){
                     this._objections.push(new Objection(link.source,[link,protoLink],Objection.RedundantSeeds,this._containingUnit));
                 }
-                if(link.seed===protoLink.seed && (link.source!==protoLink.source || link.sourceRank!== protoLink.sourceRank )){
-                    this._objections.push(new Objection(link.source,[link,protoLink],Objection.OverLoadedSeed))
+                if(link.seed===protoLink.seed && (link.source !==protoLink.source || link.sourceRank !== protoLink.sourceRank )){
+                    this._objections.push(new Objection(link.source,[link,protoLink],Objection.OverLoadedSeed,this._containingUnit))
                 }
             }
           return linkShouldBeAddedToAncestorList;
@@ -126,14 +124,10 @@ var UniqueSeedList = (function(){
 
 return UniqueSeedList
 })()
-
 function createEntryBySourceRank(registry,link){
     if(!(registry instanceof Map) || !(link instanceof Link)) Break("registry must be a Map, link must be a Link",{registry,link});
-        console.log("Inside entrycreator, before",registry);
     let newEntry = EntryCreator(["source","sourceRank"],Array)(registry,link);
-    console.log("Inside entrycreator, after",registry);
-    Break("WTF")
-        newEntry["cap"].push(link);
+       newEntry["cap"].push(link)
     return newEntry;
 }
 
@@ -165,12 +159,6 @@ function EntryCreator(propList,capConstructor){
         return returnObj
     }
 }
-function createEntryBySourceRank(registry,link){
-    if(!(registry instanceof Map) || !(link instanceof Link)) Break("registry must be a Map, link must be a Link",{registry,link});
 
-    let newEntry = EntryCreator(["source","sourceRank"],Array)(registry,link);
-        newEntry["cap"].push(link);
-    return newEntry;
-}
 
 

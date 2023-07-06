@@ -14,7 +14,7 @@ var Team = (function () {
         defineGetter({ obj: this, name: "name", func: () => name });
         defineGetter({ obj: this, name: "id", func: () => myId });
         defineGetter({ obj: this, name: "players", func: () => new Map(teamPlayers.entries())});
-        defineGetter({ obj: this, name: "ancestralLinks", func: () => []});
+        defineGetter({ obj: this, name: "ancestralLinks", func: () => new Set()});
 
         this.deleteTeam = function(){
             allTeams.delete(this.name);

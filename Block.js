@@ -14,7 +14,7 @@ var Block = (function () {
         defineGetter({ obj: this, name: "parent", func: () => parent });
         defineGetter({ obj: this, name: "phase", func: () => parent });
         defineGetter({ obj: this, name: "blockOrder", func: () => parent.allBlocksArray.indexOf(this)+1 });
-        defineGetter({ obj: this, name: "validity", func: () => ({...validity}) });
+        defineGetter({ obj: this, name: "validity", func: () => validity.copy()});
         defineGetter({ obj: this, name: "incomingLinks", func: () => {
             let allIncomingLinks =[]
             games.forEach(iGame=>allIncomingLinks.push(...iGame.incomingLinks));
@@ -35,15 +35,22 @@ var Block = (function () {
             Verification.queue(this);
             ancestralLinksRegistrar.add(link);
         }
+        this.remakeAncestralRegister = function remakeAncestralRegister(originatingLink){
+            Verification.queue(this)
+            ancestralLinksRegistrar.wipe();
+            this.incomingLinks.forEach(iLink=>this.addAncestralLink(iLink));
+            return true; 
+        }
 
         this.verifyLinks=function verifyLinks(){
             let testValidity = new ValidityTracker(true);
             Verification.revokeAllObjections(this);
             let objections =  ancestralLinksRegistrar.objections
-            objections.forEach(objection=>objection.lodge())
-            if(objections.length>0) testValidity.fail(Objection.OneBlockOneTeam)
+            if(objections.length>0){ 
+                testValidity.fail(Objection.SourceRankDuplication)
+                objections.forEach(objection=>objection.lodge())
+            }
         
-
             if (validity.status !== testValidity.status || validity.message !== testValidity.message) changeValidity(testValidity);
             return validity
         }

@@ -280,10 +280,12 @@ var TableGenerator = (function TableGeneratorBuilder(comp) {
             let source = originTeamSelector.quickLoad("source");
             let sourceRank = originTeamSelector.querySelector('.numericalInput').value;
             let currentLink = this.quickLoad(originTeamSelector);
-            currentLink?.deleteLink();
+            currentLink?.deleteLink?.();
             if (source) {
                 let newLink = game.newIncomingLink({ source, sourceRank });
                 this.quickSave(originTeamSelector, newLink)
+            } else {
+                this.quickSave(originTeamSelector, false)   
             }
         }
 
@@ -352,7 +354,7 @@ var TableGenerator = (function TableGeneratorBuilder(comp) {
                 let myPhase = phaseContainer.quickLoad("Associated");
                 let newBlock = myPhase.newBlock();
                 bond(blockContainer,newBlock);
-                blockContainer.quickSave("Associated", newBlock);
+                blockContainer.quickSave("Associated", newBlock); 
                 CodeObserver.register(newBlock); 
                 CodeObserver.addHandler(newBlock, ({ mark }) => {
                     if (mark.validity.status) {

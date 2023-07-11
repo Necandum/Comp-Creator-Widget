@@ -23,6 +23,7 @@ var Game = (function () {
             obj: this, name: "gameStages", func: () => (customGameStages) ? customGameStages :
                 this.phase.currentSettings.get(e.GAME_STAGES)
         });
+        defineGetter({ obj: this, name: "length", func: () => parseInt(this.gameStages.at(-1).endAtMiliSecond)});
 
         defineSetter({ obj: this, name: "flesh", func: (mainDiv) => associatedDivFlesh=mainDiv });
         defineGetter({ obj: this, name: "flesh", func: () => associatedDivFlesh });

@@ -3,15 +3,15 @@ function TimeMap() {
     let allItems = new Map();
 
     this.set = function addToTimeMap(newItem = {}, { startTime = 0, endTime = 0 } = {}) {
-        if (startTime instanceof Date) startTime = startTime.getTime();
-        if (endTime instanceof Date)     endTime = endTime.getTime();
+        if (startTime instanceof Date) startTime = parseInt(startTime.getTime());
+        if (endTime instanceof Date)     endTime = parseInt(endTime.getTime());
         
         this.delete(newItem);
 
         let newIndex = 0;
         let newEntry = {item:newItem,startTime,endTime};
         for(newIndex;newIndex<sortedByStart.length;newIndex++){
-            if(startTime>sortedByStart[newIndex]) break;
+            if(startTime<sortedByStart[newIndex].startTime) break;
         }
         sortedByStart.splice(newIndex,0,newEntry);
         allItems.set(newItem,newEntry);
@@ -19,7 +19,7 @@ function TimeMap() {
     };
 
     this.find = function findMatchingEntries(time){
-        if(time instanceof Date) time = time.getTime();
+        if(time instanceof Date) time = parseInt(time.getTime());
         let matchingPeriods ={entries:[],items:[]};
         for(entry of sortedByStart){
             if(entry.startTime>time) break

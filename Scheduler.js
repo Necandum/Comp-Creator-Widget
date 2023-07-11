@@ -1,221 +1,204 @@
-var Scheduler = (function(){ 
-    
-        function TimeSlot(scheduledGames,fieldNumber,game,absoluteCompStartTime){
-            if(!Number.isInteger(fieldNumber) || fieldNumber>(scheduledGames.fields.length+1)) Break("fieldNumber must be integer and field must exist",{fieldNumber})
-            if(!scheduledGames.index instanceof Map) Break("scheduledGames must be the _scheduledGames of the relevant Scheduler",{scheduledGames});
-            let me = this;
-            let field = scheduledGames.fields[fieldNumber];
-                field.push(this);
-                 
-            let startTime;
-            let indexObj = {
-                get field(){return Array.from(field)},
-                get fieldNumber(){return me.fieldNumber},
-                get fieldIndex(){return me.fieldIndex}
-            }
+var Scheduler = (function () {
 
-            defineGetter({obj:this,name:"prev",func:()=>field[this.fieldIndex-1]});
-            defineGetter({obj:this,name:"next",func:()=>field[this.fieldIndex+1]});
-            defineGetter({obj:this,name:"game",func:()=>game});
-            defineGetter({obj:this,name:"fieldIndex",func:()=>parseInt(field.indexOf(this))});
-            defineGetter({obj:this,name:"fieldNumber",func:()=>parseInt(fieldNumber)});
-            defineGetter({obj:this,name:"length",func:()=>parseInt((game) ? game.gameStages.at(-1).endAtSecond :  0)});
-            defineGetter({obj:this,name:"startTime",func:()=>parseInt(startTime)});
-            defineGetter({obj:this,name:"absoluteStartTime",func:()=>{return parseInt(startTime)*1000+parseInt(absoluteCompStartTime)}});
-            defineGetter({obj:this,name:"endTime",func:()=>parseInt(this.startTime+this.length)});           
-
-            this.assignGame = function(assignedGame){
-                if(!game instanceof Game) Break("only accepts Game",{assignedGame});
-                scheduledGames.index.set(assignedGame,indexObj);
-                scheduledGames.index.delete(game);
-                game = assignedGame;
-                return this;
-            }
-            this.assignField = function({assignedFieldNumber,assignedFieldIndex}){
-                if(!Number.isInteger(assignedFieldNumber ) || assignedFieldNumber>(scheduledGames.fields.length+1)) Break("assignedFieldNumber must be integer and field must exist",{assignedFieldNumber})
-                if(!Number.isInteger(assignedFieldIndex) && assignedFieldIndex) Break("assignedFieldIndex must be integer",{assignedFieldIndex});
-                
-                field.splice(this.fieldIndex,1);
-                let newField = scheduledGames.fields[assignedFieldNumber]
-                if(assignedFieldIndex){
-                    newField.splice(assignedFieldIndex,0,this);
-                } else {
-                    newField.push(this);
-                }
-                field=newField;
-                fieldNumber = assignedFieldNumber;
-                this.calculateStartTime();
-                return this
-            } 
-
-            this.calculateStartTime=function(){
-                startTime=(this.prev) ? this.prev.endTime: 0;
-            }
-
-            if(game) scheduledGames.index.set(game,indexObj);
-            this.calculateStartTime();
-            return this;
+    function TimeSlot(scheduledGames, fieldNumber, game, startTime,absoluteCompStartTime) {
+        if (!Number.isInteger(fieldNumber) || fieldNumber > (scheduledGames.fields.length + 1)) Break("fieldNumber must be integer and field must exist", { fieldNumber })
+        if (!(scheduledGames.index instanceof Map)) Break("scheduledGames must be the _scheduledGames of the relevant Scheduler", { scheduledGames });
+        if (!(game instanceof Game)) Break("game must be a Game",{game})
+        let field = scheduledGames.fields[fieldNumber];
+        let insertionIndex =0;
+        for(insertionIndex;insertionIndex<field.length;insertionIndex++){
+            if(startTime<field[insertionIndex].startTime) break;
         }
-    
-    
-    function Scheduler(comp,maxFieldNumber,absoluteCompStartTime=Date.now()){
+        field.splice(insertionIndex,0,this);
+
+
+        defineGetter({ obj: this, name: "prev", func: () => field[this.fieldIndex - 1] });
+        defineGetter({ obj: this, name: "next", func: () => field[this.fieldIndex + 1] });
+        defineGetter({ obj: this, name: "game", func: () => game });
+        defineGetter({ obj: this, name: "fieldIndex", func: () => parseInt(field.indexOf(this)) });
+        defineGetter({ obj: this, name: "field", func: () => field});
+        defineGetter({ obj: this, name: "fieldNumber", func: () => parseInt(fieldNumber) });
+        defineGetter({ obj: this, name: "length", func: () => parseInt(game.length)});
+        defineGetter({ obj: this, name: "startTime", func: () => parseInt(startTime) });
+        defineGetter({ obj: this, name: "absoluteStartTime", func: () => { return parseInt(startTime) + parseInt(absoluteCompStartTime) } });
+        defineGetter({ obj: this, name: "endTime", func: () => parseInt(this.startTime + this.length) });
+
+        scheduledGames.index.set(game, this);
+        field.nextAvailable=this.endTime
+        return this;
+    }
+
+
+    function Scheduler(comp, maxFieldNumber, absoluteCompStartTime = Date.now()) {
         this._allPhases = new Map();
-        comp.allPhasesArray.forEach(el=>this._allPhases.set(el,false));
-        
+        comp.allPhasesArray.forEach(phase => this._allPhases.set(phase, false));
+
         this._allGames = new Map();
-        
-        this._allPhases.forEach(
-            (readiness,phase)=>phase.allGamesInPhase.forEach(
-                (game) =>this._allGames.set(game,false)))
-        
+        comp.allGamesArray.forEach(game=>this._allGames.set(game,false));
+
         this._unscheduledGames = new Map();
-        this._allGames.forEach((readiness,game) =>{
-           let incomingLinkResults = new Map()
-            game.incomingLinks.forEach(link => incomingLinkResults.set(link,link.source instanceof Team));
-            this._unscheduledGames.set(game,incomingLinkResults)
+        this._allGames.forEach((readiness, game) => {
+            let incomingLinkResults = new Map()
+            game.incomingLinks.forEach(link => incomingLinkResults.set(link, link.source instanceof Team));
+            this._unscheduledGames.set(game, incomingLinkResults)
         })
-        
+
         this._readyGames = new Map();
-       
-        this._scheduledGames = {index:new Map(),
-                                fields:[],
-                                insert:function(fieldNumber,game){return new TimeSlot(this,fieldNumber,game,absoluteCompStartTime)},
-                                get availableField(){
-                                    return this.fields.reduce((acc,cv)=>{ 
-                                                                        let currentFinishTime = acc.at(-1)?.endTime ?? 0;
-                                                                        let potentialFinishTime = cv.at(-1)?.endTime ?? 0;
-                                                                        return (currentFinishTime<=potentialFinishTime) ? acc:cv});
-                                    },
-                                };
-        for(let fieldNumber=1;fieldNumber<=maxFieldNumber;fieldNumber++){
-            this._scheduledGames.fields[fieldNumber]=[];
-            this._scheduledGames.fields[fieldNumber].restrictions=[];
-            this._scheduledGames.fields[fieldNumber].fieldNumber=fieldNumber;
+
+        this._scheduledGames = {
+            index: new Map(),
+            fields: [],
+            insert: function (game,fieldNumber,time) { return new TimeSlot(this, fieldNumber, game,time, absoluteCompStartTime) },
+            getNextAvailable() {
+                return getAvailability(this.fields);
+            },
+        };
+        for (let fieldNumber = 1; fieldNumber <= maxFieldNumber; fieldNumber++) {
+            this._scheduledGames.fields[fieldNumber] = [];
+            this._scheduledGames.fields[fieldNumber].restrictions = new TimeMap();
+            this._scheduledGames.fields[fieldNumber].fieldNumber = fieldNumber;
+            this._scheduledGames.fields[fieldNumber].nextAvailable = 0;
         }
 
         this.assessAllGameReadiness();
-        
-    }
-    
-    Scheduler.prototype={
-        assessGameReadiness(game){
-            if(!this._unscheduledGames.has(game)) Break("Game must be unscheduled",{game,allGames:this._allGames,unscheduledGames:this._unscheduledGames});
 
-            this._unscheduledGames.forEach( 
-                (linkMap,game)=>{
+    }
+
+    function getAvailability(fields){
+        let availability = {fieldNumber:false,time:false,all:[]};
+        for(const field of fields){
+            if(!field) continue
+            availability.all.push({fieldNumber:field.fieldNumber,time:field.nextAvailable})
+        }
+        availability.all.sort((a,b)=>a.time-b.time);
+        availability.fieldNumber = availability.all[0].fieldNumber;
+        availability.time = availability.all[0].time;
+        return availability;
+    }
+
+    Scheduler.prototype = {
+        assessGameReadiness(game) {
+            if (!this._unscheduledGames.has(game)) Break("Game must be unscheduled", { game, allGames: this._allGames, unscheduledGames: this._unscheduledGames });
+
+            this._unscheduledGames.forEach(
+                (linkMap, game) => {
                     linkMap.forEach(
-                        (readiness,link) => {
-                            if(link.source instanceof Phase) linkMap.set(link,this._allPhases.get(link.source))
-                            if(link.source instanceof Game) linkMap.set(link,this._allGames.get(link.source))
+                        (readiness, link) => {
+                            if (link.source instanceof Phase) linkMap.set(link, this._allPhases.get(link.source))
+                            if (link.source instanceof Game) linkMap.set(link, this._allGames.get(link.source))
                         }
                     );
                     this.readyGame(game);
                 }
             )
         },
-        assessAllGameReadiness(){
-            this._unscheduledGames.forEach((linkMap,game)=>this.assessGameReadiness(game));
-        },
-        
-        readyAllGames(){
-            this._unscheduledGames.forEach((linkReadiness,game)=>this.readyGame(game));
+        assessAllGameReadiness() {
+            this._unscheduledGames.forEach((linkMap, game) => this.assessGameReadiness(game));
         },
 
-        readyGame (game){
-            if(!(game instanceof Game) || !this._allGames.has(game)) Break("Must be a game present in this comp",{game,allGames:this._allGames});
-            if(!this._unscheduledGames.has(game)) Break("Game must be unscheduled",{game,allGames:this._allGames,unscheduledGames:this._unscheduledGames});
+        readyAllGames() {
+            this._unscheduledGames.forEach((linkReadiness, game) => this.readyGame(game));
+        },
+
+        readyGame(game) {
+            if (!(game instanceof Game) || !this._allGames.has(game)) Break("Must be a game present in this comp", { game, allGames: this._allGames });
+            if (!this._unscheduledGames.has(game)) Break("Game must be unscheduled", { game, allGames: this._allGames, unscheduledGames: this._unscheduledGames });
             let prepared = true;
             let linkReadinessMap = this._unscheduledGames.get(game);
-            linkReadinessMap.forEach((readiness,link)=>{if(!readiness) prepared = false});
-            if(linkReadinessMap.size===0) prepared =false;
-            if(prepared){
-                this._readyGames.set(game,linkReadinessMap);
+            linkReadinessMap.forEach((readiness, link) => { if (!readiness) prepared = false });
+            if (linkReadinessMap.size === 0) prepared = false;
+            if (prepared) {
+                this._readyGames.set(game, linkReadinessMap);
                 this._unscheduledGames.delete(game);
             }
 
             return prepared;
         },
-        rankReadyGames(){
+        rankReadyGames() {
             let games = Array.from(this._readyGames.keys());
             let periods = [];
             let priorityThenBlockNum = {};
-            
+            let byLength = {};
 
-            for(let game of games){
+
+            for (let game of games) {
                 let priorityNum = game.phase.currentSettings.get(e.PRIORITY);
                 let blockNum = game.block.blockOrder;
+                let length = game.length;
 
-                if(!priorityThenBlockNum[priorityNum]) priorityThenBlockNum[priorityNum]={};
-                if(!priorityThenBlockNum[priorityNum][blockNum]) priorityThenBlockNum[priorityNum][blockNum]=[];
+                if (!priorityThenBlockNum[priorityNum]) priorityThenBlockNum[priorityNum] = {};
+                if (!priorityThenBlockNum[priorityNum][blockNum]) priorityThenBlockNum[priorityNum][blockNum] = [];
                 priorityThenBlockNum[priorityNum][blockNum].push(game)
+
+                byLength[length]?.push(game) ?? (byLength[length] = [game]);
             }
-            
-            for(let priorityNum of Object.keys(priorityThenBlockNum).sort(SortFn.numDescending)){
-                for(let blockNum of Object.keys(priorityThenBlockNum[priorityNum]).sort(SortFn.numAscending)){
+
+            for (let priorityNum of Object.keys(priorityThenBlockNum).sort(SortFn.numDescending)) {
+                for (let blockNum of Object.keys(priorityThenBlockNum[priorityNum]).sort(SortFn.numAscending)) {
                     periods.push([...priorityThenBlockNum[priorityNum][blockNum]]);
                 }
 
             }
-            return {periods,priorityThenBlockNum};
-            
+            return { periods, priorityThenBlockNum,byLength };
+
         },
-        scheduleGame(game,fieldNumber){
-            if(!(game instanceof Game) || !this._allGames.has(game)) Break("Must be a game present in this comp",{game,allGames:this._allGames});
-            if(!this._readyGames.has(game)) Break("Game must be ready for scheduling",{game,readyGames:this._readyGames});
-            this._allGames.set(game,true);
-            let newTimeSlot = this._scheduledGames.insert(fieldNumber,game);
+        scheduleGame(game, fieldNumber, time) {
+            if (!(game instanceof Game) || !this._allGames.has(game)) Break("Must be a game present in this comp", { game, allGames: this._allGames });
+            if (!this._readyGames.has(game)) Break("Game must be ready for scheduling", { game, readyGames: this._readyGames });
+            let newTimeSlot = this._scheduledGames.insert(game,fieldNumber,time);
+            this._allGames.set(game, newTimeSlot.endTime);
             this._readyGames.delete(game);
 
-            let phaseCompleteGameCounter=0;
-            game.phase.allGamesInPhase.forEach((game)=>{if(this._allGames.get(game)) phaseCompleteGameCounter++});
-            if(game.phase.allGamesInPhase.length === phaseCompleteGameCounter) this._allPhases.set(game.phase,true);
+            let phaseCompleteGameCounter = 0;
+            game.phase.allGamesInPhase.forEach((game) => { if (this._allGames.get(game)) phaseCompleteGameCounter++ });
+            if (game.phase.allGamesInPhase.length === phaseCompleteGameCounter) this._allPhases.set(game.phase, newTimeSlot.endTime);
 
             this.assessAllGameReadiness();
             return newTimeSlot;
         },
-        scheduleAll(){
+        scheduleAll() {
             let success = true;
 
-            while(this._unscheduledGames.size > 0 || this._readyGames.size>0){
+            while (this._unscheduledGames.size > 0 || this._readyGames.size > 0) {
                 let periods = this.rankReadyGames().periods;
 
-                if(periods.length===0) {
+                if (periods.length === 0) {
                     success = false;
                     break
                 }
-                let availableFieldNumber = this._scheduledGames.availableField.fieldNumber;
-                this.scheduleGame(periods[0][0],availableFieldNumber);
+                let nextAvailable = this._scheduledGames.getNextAvailable();
+                this.scheduleGame(periods[0][0], nextAvailable.fieldNumber,nextAvailable.time);
             }
             return success
         },
-        getFieldSchedule(){
-            let fields = this._scheduledGames.fields;       
-              
-            let simplifiedFieldSchedule =[];
-            for(let i=1;i<fields.length;i++){
-                simplifiedFieldSchedule[i]=[];
-                for(const timeSlot of fields[i]){
+        getFieldSchedule() {
+            let fields = this._scheduledGames.fields;
+
+            let simplifiedFieldSchedule = [];
+            for (let i = 1; i < fields.length; i++) {
+                simplifiedFieldSchedule[i] = [];
+                for (const timeSlot of fields[i]) {
                     simplifiedFieldSchedule[i].push({
-                        game:timeSlot.game,
-                        absoluteStartTime:timeSlot.absoluteStartTime,
-                        fieldNumber:timeSlot.fieldNumber
+                        game: timeSlot.game,
+                        absoluteStartTime: timeSlot.absoluteStartTime,
+                        fieldNumber: timeSlot.fieldNumber
                     })
                 }
             }
             return simplifiedFieldSchedule
         },
-    
 
-        
-        
+
+
+
     }
-    Scheduler.prototype.constructor=Scheduler
+    Scheduler.prototype.constructor = Scheduler
 
-    
-    
 
-return Scheduler
-})() 
+
+
+    return Scheduler
+})()
 
 
 

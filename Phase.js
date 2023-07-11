@@ -7,8 +7,8 @@ var Phase = (function () {
             [e.PRIORITY, 1], //int
             [e.TOTAL_GAME_SECONDS, 1800], //int
             [e.GAME_STAGES, [ //array of objects. playTime makes segment count as game time. player available marks whether player can be elsewhere. e.g halftime is not part of gametime, but players are not free. 
-                { label: "Game", playTime: true, playerAvailable: false, endAtSecond: 1200 },
-                { label: "Change-Over", playTime: false, playerAvailable: true, endAtSecond: 1800 }
+                { label: "Game", playTime: true, playerAvailable: false, endAtMiliSecond: 20*60*1000 },
+                { label: "Change-Over", playTime: false, playerAvailable: true, endAtMiliSecond: 30*60*1000 }
             ]],
         ])
         let blocks = [];
@@ -137,7 +137,7 @@ var Phase = (function () {
                         if (typeof element.label !== "string") throw new Error("Each object must contain a label which is a string");
                         if (typeof element.playTime !== "boolean") throw new Error("Each object must contain a playTime which is a boolean");
                         if (typeof element.playerAvailable !== "boolean") throw new Error("Each object must contain a playerAvailable which is a boolean");
-                        if (typeof element.endAtSecond !== "number") throw new Error("Each object must contain a endAtSecond which is a number");
+                        if (typeof element.endAtMiliSecond !== "number") throw new Error("Each object must contain a endAtMiliSecond which is a number");
                     });
                     settings.set(setting, newValue);
                     break;

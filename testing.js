@@ -77,8 +77,8 @@ function setLink(game, { index = 0, source,sourceRank=1 }) {
     sourceOption.selected = true;
     game.flesh.querySelectorAll(".sourceRankInput")[index].value=sourceRank;
     sourceSelect.dispatchEvent(mEvent.input)
-
 }
+Verification.pause();
 newPhase({phaseType:e.TOURNAMENT,name:"T"})
 newGame(blocks[1][1])
 newBlock(phases[1])
@@ -88,7 +88,6 @@ newBlock(phases[1])
 
 
 newPhase({phaseType:e.ROUND_ROBIN,name:"RR"})
-console.log(blocks,games)
 newGame(blocks[2][1])
 newBlock(phases[2])
 newGame(blocks[2][2])
@@ -101,31 +100,28 @@ setLink(games[1][1][2], { index: 1, source: teams[4] })
 
 setLink(games[1][2][1], { index: 0, source: games[1][1][1],sourceRank:1 })
 setLink(games[1][2][1], { index: 1, source: games[1][1][1],sourceRank:2 })
-setLink(games[1][2][2], { index: 0, source: phases[2],sourceRank:1 })
+setLink(games[1][2][2], { index: 0, source: games[1][1][2],sourceRank:1 })
 setLink(games[1][2][2], { index: 1, source: games[1][1][2],sourceRank:2 })
 
-// setLink(games[1][3][1], { index: 0, source: games[1][2][1],sourceRank:1 })
-// setLink(games[1][3][1], { index: 1, source: games[2][1][1],sourceRank:2 })
-//Phase 2 set links
+setLink(games[1][3][1], { index: 0, source: games[1][2][1],sourceRank:1 })
+setLink(games[1][3][1], { index: 1, source: games[2][1][1],sourceRank:2 })
+// //Phase 2 set links
 setLink(games[2][1][1], { index: 0, source: teams[5] })
 setLink(games[2][1][1], { index: 1, source: teams[6] })
 setLink(games[2][1][2], { index: 0, source: teams[7] })
 setLink(games[2][1][2], { index: 1, source: teams[8] })
 
-// setLink(games[2][2][1], { index: 0, source: games[2][1][1],sourceRank:1 })
-// setLink(games[2][2][1], { index: 1, source: games[2][1][1],sourceRank:2 })
-// setLink(games[2][2][2], { index: 0, source: games[1][1][2],sourceRank:1 })
-// setLink(games[2][2][2], { index: 1, source: games[1][1][2],sourceRank:2 })
+setLink(games[2][2][1], { index: 0, source: games[2][1][1],sourceRank:1 })
+setLink(games[2][2][1], { index: 1, source: games[2][1][1],sourceRank:2 })
+setLink(games[2][2][2], { index: 0, source: games[1][1][2],sourceRank:1 })
+setLink(games[2][2][2], { index: 1, source: games[1][1][2],sourceRank:2 })
 
-// setLink(games[2][3][1], { index: 0, source: games[1][2][1],sourceRank:1 })
-// setLink(games[2][3][1], { index: 1, source: games[1][2][2],sourceRank:1 })
+setLink(games[2][3][1], { index: 0, source: games[1][2][1],sourceRank:1 })
+setLink(games[2][3][1], { index: 1, source: games[1][2][2],sourceRank:1 })
 
+Verification.unPause();
 
 // s.scheduleAll();
 
 
-document.addEventListener("keydown",(ev)=>{
-    if(ev.key==="Control"){
-        console.log(document.querySelectorAll("body *:hover"))
-    }
-})
+

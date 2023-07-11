@@ -107,6 +107,10 @@ var Game = (function () {
                     new Objection(this,[inLink],Objection.RoundRobinGameAsSource,this)
                     testValidity.fail(Objection.RoundRobinGameAsSource)
                 }
+                if(inLink.source?.phase?.phaseType===e.TOURNAMENT && inLink.source instanceof Phase){
+                    new Objection(this,[inLink],Objection.TournamentAsSource,this)
+                    testValidity.fail(Objection.TournamentAsSource)
+                }
             });
 
             if (validity.status !== testValidity.status || validity.message !== testValidity.message) changeValidity(testValidity);

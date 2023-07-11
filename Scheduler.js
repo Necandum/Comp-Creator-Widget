@@ -143,7 +143,7 @@ var Scheduler = (function(){
 
             for(let game of games){
                 let priorityNum = game.phase.currentSettings.get(e.PRIORITY);
-                let blockNum = game.parent.blockOrder;
+                let blockNum = game.block.blockOrder;
 
                 if(!priorityThenBlockNum[priorityNum]) priorityThenBlockNum[priorityNum]={};
                 if(!priorityThenBlockNum[priorityNum][blockNum]) priorityThenBlockNum[priorityNum][blockNum]=[];

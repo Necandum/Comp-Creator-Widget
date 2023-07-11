@@ -94,6 +94,7 @@ return PostponeMakingAncestralLinks
  * @enum RecursiveLoop
  * @enum TwoTeamGame
  * @enum GameOnlyTwoRanks
+ * @enum TournamentAsSource
  * @enum RoundRobinGameAsSource
  * @enum NotATournament
  * @enum OneBlockOneTeam
@@ -108,6 +109,7 @@ var Objection = (function(){
    Objection["RecursiveLoop"]=  Symbol("A loop has been created, such that a game's or phase's sources are determiend by its outcome.");
    Objection["TwoTeamGame"]=  Symbol("Two and only two incoming links must exist");
    Objection["GameOnlyTwoRanks"]=  Symbol("Only ranks 1 and 2 valid for Games");
+   Objection["TournamentAsSource"]=  Symbol("A Tournament phase cannot be used as a source");
    Objection["RoundRobinGameAsSource"]=  Symbol("Games inside a round robin cannot be a source.");
    Objection["NotATournament"]=  Symbol("In a round robin, games cannot be dependant on outcome of other games in the same Phase.");
    Objection["OneBlockOneTeam"]=  Symbol("A team can only appear once per block, or even have the potential for doing. ");

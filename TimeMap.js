@@ -23,7 +23,7 @@ function TimeMap() {
         let matchingPeriods ={entries:[],items:[]};
         for(entry of sortedByStart){
             if(entry.startTime>time) break
-            if(entry.endTime>time){
+            if(entry.endTime>=time){
                  matchingPeriods.entries.push(entry);
                  matchingPeriods.items.push(entry.item);
             }

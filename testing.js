@@ -4,7 +4,7 @@ let mEvent = {
     focusOut: new Event("focusout", { bubbles: true }),
     focusIn: new Event("focusin", { bubbles: true })
 }
-
+let oLog ={};
 
 let teams = {
   

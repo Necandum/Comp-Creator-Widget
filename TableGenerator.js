@@ -433,7 +433,7 @@ var TableGenerator = (function TableGeneratorBuilder(comp) {
             let startTimeText = initialRow.querySelector("[data-time-comp-start]").value;
             let startDate = new Date(`${startDateText}T${startTimeText}`);
             let scheduling = new Scheduler(comp, maxField, startDate.getTime())
-            scheduling.scheduleAll();
+            scheduling.scheduleAll(); oLog.schedule=scheduling;
             let simpleSchedule = scheduling.getFieldSchedule();
             this.elder['table'].quickSave("csv", { team: CSVGenerator.teamCSV(), draw: CSVGenerator.drawCSV(simpleSchedule) });
             for (let i = 1; i < simpleSchedule.length; i++) {

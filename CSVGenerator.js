@@ -42,6 +42,7 @@ var CSVGenerator = (function(){
         for(let i =1;i<simpleSchedule.length;i++){
             const field = simpleSchedule[i];
             for(const timeSlot of field){
+                if(!(timeSlot.game)) continue;
                 let game = timeSlot.game;
                 let poolName = (game.phase.phaseType === e.ROUND_ROBIN) ? game.phase.name : game.name;
                 let team1 = (timeSlot.game.incomingLinks[0].source instanceof Team) ? game.incomingLinks[0].source.name:

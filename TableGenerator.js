@@ -443,9 +443,9 @@ var TableGenerator = (function TableGeneratorBuilder(comp) {
                 for (timeSlot of simpleSchedule[i]) {
                     let slot = document.createElement('div');
                     let startDate = new Date(timeSlot.absoluteStartTime);
-                    let link1 = timeSlot.game.incomingLinks[0];
-                    let link2 = timeSlot.game.incomingLinks[1]
-                    slot.append(`Source:${link1.source.name} (${link1.sourceRank ?? ""}) vs. ${link2.source.name} (${link2.sourceRank ?? ""})`);
+                    slot.append(timeSlot.name);
+                    slot.append(document.createElement("br"));
+                    slot.append(timeSlot.description)
                     slot.append(document.createElement("br"));
                     slot.append(`${getDayName(startDate.getDay())}, ${startDate.toLocaleTimeString()}`)
                     fieldContainer.append(slot);

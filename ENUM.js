@@ -16,7 +16,9 @@ var e = {
         PHASE:"phase",
         FIELD_NUMEBER:"fieldNumber",
         SEED:"seed",
-        GAME_VALIDITY:"gameValidity"
+        GAME_VALIDITY:"gameValidity",
+        FIELD_CLOSURE:"fieldClosure",
+        TIME_SLOT:"timeSlot"
 }
 
 

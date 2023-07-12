@@ -7,7 +7,9 @@ var Scheduler = (function () {
         let field = scheduledGames.fields[fieldNumber];
         
 
-
+        this.type = e.TIME_SLOT;
+        this.name=game.name;
+        this.description = `${game.incomingLinks[0].source.name} (${game.incomingLinks[0].sourceRank}) vs ${game.incomingLinks[1].source.name} (${game.incomingLinks[1].sourceRank})`
         defineGetter({ obj: this, name: "prev", func: () => field[this.fieldIndex - 1] });
         defineGetter({ obj: this, name: "next", func: () => field[this.fieldIndex + 1] });
         defineGetter({ obj: this, name: "game", func: () => game });
@@ -52,6 +54,11 @@ var Scheduler = (function () {
             index: new Map(),
             fields: [],
             insert(game,fieldNumber,time) { return new TimeSlot(this, fieldNumber, game,time, absoluteCompStartTime) },
+            closeField(fieldNumber=1,startTime=0,endTime=Number.POSITIVE_INFINITY,description=""){
+                let field = this.fields[fieldNumber];
+                if(field.length>0) Break("Cannot close a field once scheduling has begun");
+                field.set({type:e.FIELD_CLOSURE,description,name:"Field Closed"},{startTime,endTime})
+            },
             getNextAvailable() {
                 return getAvailability(this.fields);
             },
@@ -182,6 +189,8 @@ var Scheduler = (function () {
                 for (const timeSlot of fields[i]) {
                     simplifiedFieldSchedule[i].push({
                         game: timeSlot.game,
+                        name:timeSlot.name,
+                        description:timeSlot.description,
                         absoluteStartTime: timeSlot.absoluteStartTime,
                         fieldNumber: timeSlot.fieldNumber
                     })
@@ -192,6 +201,7 @@ var Scheduler = (function () {
 
     }
     Scheduler.prototype.constructor = Scheduler
+    Scheduler.TimeSlot = TimeSlot;
     return Scheduler
 })()
 

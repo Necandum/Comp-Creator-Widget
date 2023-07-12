@@ -8,7 +8,7 @@ function TimeMap() {
             yield sortedByStart[i].item
         }
     }
-
+    defineGetter({obj:this,name:"length",func:()=>sortedByStart.length})
     this.set = function addToTimeMap(newItem = {}, { startTime = 0, endTime = 0 } = {}) {
         if (startTime instanceof Date) startTime = parseInt(startTime.getTime());
         if (endTime instanceof Date)     endTime = parseInt(endTime.getTime());

@@ -43,6 +43,7 @@ var CSVGenerator = (function(){
             const field = simpleSchedule[i];
             for(const timeSlot of field){
                 let game = timeSlot.game;
+                let poolName = (game.phase.phaseType === e.ROUND_ROBIN) ? game.phase.name : game.name;
                 let team1 = (timeSlot.game.incomingLinks[0].source instanceof Team) ? game.incomingLinks[0].source.name:
                                                                                      linkingFormat(game.incomingLinks[0]);
 
@@ -51,7 +52,7 @@ var CSVGenerator = (function(){
                 let gameArray = [
                 convertDateToCompCreatorTimeString( new Date(timeSlot.absoluteStartTime)),
                 timeSlot.fieldNumber.toString(),
-                timeSlot.game.name.toString(),
+                poolName.toString(),
                 team1,
                 team2,
                 "X",

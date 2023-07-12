@@ -7,6 +7,7 @@ var Verification = (function(){
     let Verification = {
         objections: new Set(),
         forVerification: new Set(),
+        get paused(){return paused},
         addObjection(objection){
             this.objections.add(objection)
         },

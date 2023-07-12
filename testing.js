@@ -125,3 +125,28 @@ Verification.unPause();
 
 
 
+let a = new TimeMap();
+a.set("1",{startTime:0,endTime:50})
+a.set("2",{startTime:30,endTime:50})
+a.set("3",{startTime:50,endTime:75})
+a.set("3.1",{startTime:51,endTime:75})
+a.set("4",{startTime:80,endTime:101})
+a.set("4.1",{startTime:80,endTime:100})
+a.set("5",{startTime:100,endTime:120})
+a.set("6",{startTime:150,endTime:160})
+a.set("7",{startTime:155,endTime:190})
+a.set("8",{startTime:156,endTime:300})
+a.set("9",{startTime:200,endTime:280})
+
+// console.log(a.findOverlap(50),"overal 50");
+// console.log(a.findOverlap(76),"overlap 76");
+// console.log(a.findOverlap(250),"overlap 250");
+console.log(a.findGap(50))
+console.log(a.findGap(80))
+console.log(a.findGap(130))
+console.log(a.findGap(200))
+a.delete("8")
+console.log(a.findGap(200))
+a.set("8",{startTime:156,endTime:400})
+a.set("8",{startTime:410,endTime:20})
+console.log(a.findGap(200))

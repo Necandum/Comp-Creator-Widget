@@ -334,7 +334,7 @@ var TableGenerator = (function TableGeneratorBuilder(comp) {
                     }
                     else {
                         gameContainer.classList.add("invalid")
-                        console.log(mark.name,mark.validity.message);
+                       if(!Verification.paused) console.log(mark.name,mark.validity.message);
                     }
                 })
                 gameContainer.quickSave("Associated", newGame);

@@ -101,7 +101,7 @@ var UniqueSourceRankRegistry = (function(){
             this._uniqueSourceRankRegistry.clear()
         },
     }
-    defineGetter({obj:uniqueSourceRankRegistry.prototype,name:"uniqueArray",func:function(){return new Set(this._uniqueSourceRankRegistry)}}) //change to provide copy in future. 
+    defineGetter({obj:uniqueSourceRankRegistry.prototype,name:"uniqueArray",func:function(){return new Set(this._uniqueSourceRankRegistry)}}) 
     defineGetter({obj:uniqueSourceRankRegistry.prototype,name:"objections",func:function(){return []}})
     uniqueSourceRankRegistry.prototype.constructor = uniqueSourceRankRegistry;
 

@@ -18,7 +18,7 @@ var e = {
         SEED:"seed",
         GAME_VALIDITY:"gameValidity",
         FIELD_CLOSURE:"fieldClosure",
-        TIME_SLOT:"timeSlot"
+        GAME_SLOT:"gameSlot"
 }
 
 

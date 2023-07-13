@@ -1,34 +1,45 @@
 var Scheduler = (function () {
 
-    function TimeSlot(scheduledGames, fieldNumber, game, startTime,absoluteCompStartTime) {
+    function TimeSlot({scheduledGames,absoluteCompStartTime,name, description,scheduledItem,fieldNumber, startTime,length,type}) {
         if (!Number.isInteger(fieldNumber) || fieldNumber > (scheduledGames.fields.length + 1)) Break("fieldNumber must be integer and field must exist", { fieldNumber })
         if (!(scheduledGames.index instanceof Map)) Break("scheduledGames must be the _scheduledGames of the relevant Scheduler", { scheduledGames });
-        if (!(game instanceof Game)) Break("game must be a Game",{game})
         let field = scheduledGames.fields[fieldNumber];
         
-
-        this.type = e.TIME_SLOT;
-        this.name=game.name;
-        this.description = `${game.incomingLinks[0].source.name} (${game.incomingLinks[0].sourceRank}) vs ${game.incomingLinks[1].source.name} (${game.incomingLinks[1].sourceRank})`
         defineGetter({ obj: this, name: "prev", func: () => field[this.fieldIndex - 1] });
         defineGetter({ obj: this, name: "next", func: () => field[this.fieldIndex + 1] });
-        defineGetter({ obj: this, name: "game", func: () => game });
         defineGetter({ obj: this, name: "fieldIndex", func: () => parseInt(field.indexOf(this))});
         defineGetter({ obj: this, name: "field", func: () => field});
         defineGetter({ obj: this, name: "fieldNumber", func: () => parseInt(fieldNumber) });
-        defineGetter({ obj: this, name: "length", func: () => parseInt(game.length)});
         defineGetter({ obj: this, name: "startTime", func: () => parseInt(startTime) });
         defineGetter({ obj: this, name: "absoluteStartTime", func: () => { return parseInt(startTime) + parseInt(absoluteCompStartTime) } });
         defineGetter({ obj: this, name: "endTime", func: () => parseInt(this.startTime + this.length) });
+        defineGetter({ obj: this, name: "length", func: () => parseInt(length)});
+        defineGetter({ obj: this, name: "scheduledItem", func: () => scheduledItem });
+        defineGetter({ obj: this, name: "name", func: () => name });
+        defineGetter({ obj: this, name: "description", func: () => description });
+        defineGetter({ obj: this, name: "type", func: () => type });
 
-        scheduledGames.index.set(game, this);
-        field.set(this,{startTime:this.startTime,endTime:this.endTime});
-        field.nextAvailable=this.endTime
+            scheduledGames.index.set(scheduledItem, this);
+            field.set(this,{startTime:this.startTime,endTime:this.endTime});
+
         return this;
+    }
+    
+    function Restriction(startField,endField,startTime,endTime,type,name,description){
+        defineGetter({obj:this,name:"startField",func:()=>startField})
+        defineGetter({obj:this,name:"endField",func:()=>endField})
+        defineGetter({obj:this,name:"startTime",func:()=>startTime})
+        defineGetter({obj:this,name:"endTime",func:()=>endTime})
+        defineGetter({obj:this,name:"type",func:()=>type})
+        defineGetter({obj:this,name:"name",func:()=>name})
+        defineGetter({obj:this,name:"description",func:()=>description})
+        
+        return this
     }
 
 
-    function Scheduler(comp, maxFieldNumber, absoluteCompStartTime = Date.now()) {
+    function Scheduler(comp, maxFieldNumber, absoluteCompStartTime = Date.now(),restrictions=[]) {
+        let me = this;
         this._allPhases = new Map();
         comp.allPhasesArray.forEach(phase => this._allPhases.set(phase, false));
 
@@ -40,6 +51,7 @@ var Scheduler = (function () {
         });
 
        defineGetter({obj:this,name:"shortestGameTime",func:()=>parseInt(shortestGameTime)})
+       defineGetter({obj:this,name:"absoluteCompStartTime",func:()=>parseInt(absoluteCompStartTime)})
 
         this._unscheduledGames = new Map();
         this._allGames.forEach((readiness, game) => {
@@ -53,12 +65,8 @@ var Scheduler = (function () {
         this._scheduledGames = {
             index: new Map(),
             fields: [],
-            insert(game,fieldNumber,time) { return new TimeSlot(this, fieldNumber, game,time, absoluteCompStartTime) },
-            closeField(fieldNumber=1,startTime=0,endTime=Number.POSITIVE_INFINITY,description=""){
-                let field = this.fields[fieldNumber];
-                if(field.length>0) Break("Cannot close a field once scheduling has begun");
-                field.set({type:e.FIELD_CLOSURE,description,name:"Field Closed"},{startTime,endTime})
-            },
+            insert(game,fieldNumber,time) { return new GameSlot(game,fieldNumber,time) },
+            closeField(restriction,fieldNumber,time){return new ClosureSlot(restriction,fieldNumber)},
             getNextAvailable() {
                 return getAvailability(this.fields);
             },
@@ -68,9 +76,45 @@ var Scheduler = (function () {
             this._scheduledGames.fields[fieldNumber].restrictions = new TimeMap();
             this._scheduledGames.fields[fieldNumber].fieldNumber = fieldNumber;
             this._scheduledGames.fields[fieldNumber].nextAvailable = 0;
+            for(const restriction of restrictions){
+                if(fieldNumber>=restriction.startField && fieldNumber<=restriction.endField){
+                    if(restriction.type===e.FIELD_CLOSURE){
+                        this._scheduledGames.closeField(restriction,fieldNumber)
+                    }
+                }
+            }
         }
 
-        this.assessAllGameReadiness();
+        function GameSlot(game,fieldNumber,startTime){
+          let gameSlot =   new TimeSlot({ 
+                scheduledGames:me._scheduledGames,
+                absoluteCompStartTime,
+                name:game.name,
+                description: `${game.incomingLinks[0].source.name} (${game.incomingLinks[0].sourceRank}) vs ${game.incomingLinks[1].source.name} (${game.incomingLinks[1].sourceRank})`,
+                scheduledItem: game,
+                fieldNumber,
+                startTime,
+                length:game.length,
+                type:e.GAME_SLOT
+            })
+            gameSlot.field.nextAvailable=gameSlot.endTime;
+            return gameSlot;
+        }
+        
+        function ClosureSlot(restriction,fieldNumber){
+            return new TimeSlot({
+                scheduledGames:me._scheduledGames,
+                absoluteCompStartTime,
+                name:restriction.name,
+                description:restriction.description,
+                scheduledItem: restriction,
+                fieldNumber,
+                startTime:restriction.startTime,
+                length:restriction.length,
+                type:e.FIELD_CLOSURE
+            })
+        }
+        
 
     }
 
@@ -167,16 +211,22 @@ var Scheduler = (function () {
         },
         scheduleAll() {
             let success = true;
-
+            this.assessAllGameReadiness();
             while (this._unscheduledGames.size > 0 || this._readyGames.size > 0) {
-                let periods = this.rankReadyGames().periods;
-
-                if (periods.length === 0) {
+                let rankingObject = this.rankReadyGames();
+                if (rankingObject.periods.length === 0) {
                     success = false;
                     break
                 }
                 let nextAvailable = this._scheduledGames.getNextAvailable();
-                this.scheduleGame(periods[0][0], nextAvailable.fieldNumber,nextAvailable.time);
+                let choiceArray;
+                for(const fieldInfo of nextAvailable.all){
+                    let scoringObject = serialScoring(this._scheduledGames,fieldInfo,[],rankingObject);
+                    //if a game can be chosen, push choice to array, break. 
+                }
+                //order choice array, pick earliest game.
+                //schedule earliest game
+                this.scheduleGame(rankingObject.periods[0][0], nextAvailable.fieldNumber,nextAvailable.time);
             }
             return success
         },
@@ -188,7 +238,7 @@ var Scheduler = (function () {
                 simplifiedFieldSchedule[i] = [];
                 for (const timeSlot of fields[i]) {
                     simplifiedFieldSchedule[i].push({
-                        game: timeSlot.game,
+                        scheduledItem: timeSlot.scheduledItem,
                         name:timeSlot.name,
                         description:timeSlot.description,
                         absoluteStartTime: timeSlot.absoluteStartTime,
@@ -202,8 +252,23 @@ var Scheduler = (function () {
     }
     Scheduler.prototype.constructor = Scheduler
     Scheduler.TimeSlot = TimeSlot;
+    Scheduler.Restriction = Restriction;
     return Scheduler
 })()
 
 
 
+function serialScoring(scheduledGames,fieldInfo,scoreFuncArray,rankingObject){
+    let scoringObject = {gameScoresByPeriod:[],minLength:rankingObject.minLength,chosenGame:false,chosenStartTime:false,chosenField:false}
+    for(const period of rankingObject.periods){
+        scoringObject.gameScoresByPeriod.push([])
+        for(const game of period){
+            scoringObject.gameScoresByPeriod.at(-1).push({game,score:0,reason:""})
+        }
+    }
+    for(const scoreFunc of scoreFuncArray){
+        scoringObject = scoreFunc(scoringObject,scheduledGames,fieldInfo);
+    }
+    //game chosen here
+    return scoringObject; 
+}

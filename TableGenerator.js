@@ -433,7 +433,7 @@ var TableGenerator = (function TableGeneratorBuilder(comp) {
             let startTimeText = initialRow.querySelector("[data-time-comp-start]").value;
             let startDate = new Date(`${startDateText}T${startTimeText}`) ?? new Date();
             if(isNaN(startDate.getTime())) startDate = new Date();
-            let scheduling = new Scheduler(comp, maxField, startDate.getTime())
+            let scheduling = new Scheduler(comp, maxField, startDate.getTime(),[new Scheduler.Restriction(0,2,35*60*1000,45*60*1000,e.FIELD_CLOSURE,"Field Closed","Bugger Off")])
             scheduling.scheduleAll(); oLog.schedule=scheduling;
             let simpleSchedule = scheduling.getFieldSchedule();
             this.elder['table'].quickSave("csv", { team: CSVGenerator.teamCSV(), draw: CSVGenerator.drawCSV(simpleSchedule) });

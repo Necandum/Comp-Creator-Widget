@@ -95,8 +95,10 @@ var Phase = (function () {
                     objections.forEach(objection=>{objection.lodge();testValidity.fail(objection.reason)})
                 }
 
-            let maxPossibleTeams=this.ancestralLinks.length; //array is 1 indexed
+            let maxPossibleTeams=Array.from(this.ancestralLinks).filter(x=>x.source instanceof Team).length; 
+            console.log("Phase verification",this.outgoingLinks,this.name,this.ancestralLinks)
                 this.outgoingLinks.forEach((outLink) => {
+                    console.log(outLink.sourceRank,maxPossibleTeams)
                 if(outLink.sourceRank > maxPossibleTeams) {
                     new Objection(outLink.target,[outLink],Objection.NotEnoughTeams,this)
                     testValidity.fail(Objection.NotEnoughTeams)

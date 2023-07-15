@@ -13,6 +13,8 @@ function TimeMap() {
         if (startTime instanceof Date) startTime = parseInt(startTime.getTime());
         if (endTime instanceof Date)     endTime = parseInt(endTime.getTime());
         if(startTime>endTime) {[endTime,startTime] = [startTime,endTime]; Alert("Start time less than end time.",{times:arguments[1]})}
+        if(!Number.isInteger(startTime) || !Number.isInteger(endTime)) Break("Both start and end time must be integers",{newItem,startTime,endTime})
+
         this.delete(newItem);
         let newEntry = {item:newItem,startTime,endTime};
         sortedByStart.push(newEntry);
@@ -106,6 +108,7 @@ function TimeMap() {
 
     this.findGap = function findGap(time){
         let gap ={startTime:false,endTime:false,length:false,previousEntries:[],nextEntries:[]}
+        if(time===Number.POSITIVE_INFINITY) return gap;
         let initialSearch = this.findOverlap(time);
 
         if(initialSearch.match){ //start inside entry/entries
@@ -120,15 +123,17 @@ function TimeMap() {
                     break;
                 }
             }
-          if(gap.endTime)  gap.nextEntries = this.findNext(gap.endTime).entries;
-            gap.previousEntries = this.findPrevious(gap.startTime).entries;
+          if(gap.endTime)  gap.nextEntries = this.findNext(gap.endTime).entries ?? false;
+            gap.previousEntries = this.findPrevious(gap.startTime).entries ?? false;
         } else { //start inside a gap already
-            gap.nextEntries = initialSearch.nextEntries;
-            gap.previousEntries = this.findPrevious(time).entries;
-            gap.startTime = (gap.previousEntries.length===0) ? 0 : gap.previousEntries[0].endTime;
-            gap.endTime = (gap.nextEntries.length===0) ? false : gap.nextEntries[0].startTime;
+            gap.nextEntries = initialSearch.nextEntries ?? false;
+            gap.previousEntries = this.findPrevious(time)?.entries ?? false;
+            gap.startTime = (!gap.previousEntries) ? 0 : gap.previousEntries[0].endTime;
+            gap.endTime = (!gap.nextEntries) ? false : gap.nextEntries[0].startTime;
         }
-        gap.length = (gap.endTime) ? gap.endTime-gap.startTime: Number.POSITIVE_INFINITY;
+        if(gap.endTime ===false) gap.endTime = Number.POSITIVE_INFINITY;
+        gap.length =  gap.endTime-gap.startTime;
+        
         return gap;
     }
 

@@ -42,13 +42,13 @@ var CSVGenerator = (function(){
         for(let i =1;i<simpleSchedule.length;i++){
             const field = simpleSchedule[i];
             for(const timeSlot of field){
-                if(!(timeSlot.game)) continue;
-                let game = timeSlot.game;
+                if(!(timeSlot.scheduledItem instanceof Game)) continue;
+                let game = timeSlot.scheduledItem;
                 let poolName = (game.phase.phaseType === e.ROUND_ROBIN) ? game.phase.name : game.name;
-                let team1 = (timeSlot.game.incomingLinks[0].source instanceof Team) ? game.incomingLinks[0].source.name:
+                let team1 = (game.incomingLinks[0].source instanceof Team) ? game.incomingLinks[0].source.name:
                                                                                      linkingFormat(game.incomingLinks[0]);
 
-                let team2 = (timeSlot.game.incomingLinks[1].source instanceof Team) ? game.incomingLinks[1].source.name:
+                let team2 = (game.incomingLinks[1].source instanceof Team) ? game.incomingLinks[1].source.name:
                                                                                       linkingFormat(game.incomingLinks[1]);
                 let gameArray = [
                 convertDateToCompCreatorTimeString( new Date(timeSlot.absoluteStartTime)),

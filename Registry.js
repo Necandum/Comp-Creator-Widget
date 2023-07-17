@@ -25,6 +25,22 @@ var AncestorRegistry = (function(){
             }
             return true;
         },
+        test(source){
+            let clashing=false;
+            for(const ancestorLink of source.ancestralLinks){
+                if(ancestorLink.source === this._containingUnit || ancestorLink.source === this._containingUnit.phase){
+                    Break("Loop made it past the bracket stage",{link})
+                    return false;
+                }
+                if(!this._uniqueAncestorLinks.has(ancestorLink)){
+                   if(this._registrar.test(ancestorLink)){
+                    clashing=true;
+                    break;
+                   }
+                }
+            }
+            return clashing;
+        },
         _uniqueAdd(link){
             if(this._uniqueAncestorLinks.has(link)){
                 return false;
@@ -66,6 +82,9 @@ var SourceRankRegistry = (function(){
             if (newEntry["sourceRankGroup"].length > 1){
                this._objections.push(new Objection(newEntry["source"],newEntry["sourceRankGroup"],Objection.SourceRankDuplication,this._containingUnit));
             }
+        },
+        test(link){
+            return Boolean(this._registry.get(link.source)?.get(link.sourceRank)?.length>0)
         },
         wipe(){
             this._objections.forEach(objection => objection.revoke());

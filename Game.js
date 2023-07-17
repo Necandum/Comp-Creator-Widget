@@ -50,6 +50,9 @@ var Game = (function () {
                 this.phase.addAncestralLink(link);
                };
         }
+        this.testForCollision= function testForCollision(game){
+            return ancestralLinksRegistrar.test(game);
+        }
         this.removeLink = function removeLink(link) {
             if (!(link instanceof Link)) Break("Only Links can be so removed. ",{link});
             if (!link.forDeletion)  return link.deleteLink();

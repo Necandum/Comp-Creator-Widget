@@ -121,8 +121,11 @@ setLink(games[2][3][1], { index: 1, source: games[1][2][2],sourceRank:1 })
 
 Verification.unPause();
 
+var testingRestrictions=[new Scheduler.Restriction(0,2,35*60*1000,45*60*1000,e.FIELD_CLOSURE,"Field Closed","Bugger Off")];
 // s.scheduleAll();
-
+testingRestrictions.new = function(startField,endField,startMin,endMin,name,description){
+   return this.push(new Scheduler.Restriction(startField,endField,startMin*60*1000,endMin*60*1000,e.FIELD_CLOSURE,name,description))
+}
 
 
 // let a = new TimeMap();

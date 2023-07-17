@@ -13,7 +13,7 @@ function TimeMap() {
         if (startTime instanceof Date) startTime = parseInt(startTime.getTime());
         if (endTime instanceof Date)     endTime = parseInt(endTime.getTime());
         if(startTime>endTime) {[endTime,startTime] = [startTime,endTime]; Alert("Start time less than end time.",{times:arguments[1]})}
-        if(!Number.isInteger(startTime) || !Number.isInteger(endTime)) Break("Both start and end time must be integers",{newItem,startTime,endTime})
+        if(!(Number.isInteger(startTime)||startTime===Number.POSITIVE_INFINITY) || !(Number.isInteger(endTime)||endTime===Number.POSITIVE_INFINITY)) Break("Both start and end time must be integers or infinity",{newItem,startTime,endTime})
 
         this.delete(newItem);
         let newEntry = {item:newItem,startTime,endTime};
@@ -61,7 +61,7 @@ function TimeMap() {
                 if(!findResult.nextEntries){
                     findResult.nextEntries=[TimeMap.copyAddIndex(entry,i)]
                 } else if(entry.startTime===findResult.nextEntries[0].startTime){
-                    nextEntries.push(TimeMap.copyAddIndex(entry,i));
+                    findResult.nextEntries.push(TimeMap.copyAddIndex(entry,i));
                 } else {
                     break
                 }
@@ -107,7 +107,7 @@ function TimeMap() {
     }
 
     this.findGap = function findGap(time){
-        let gap ={startTime:false,endTime:false,length:false,previousEntries:[],nextEntries:[]}
+        let gap ={startTime:false,endTime:false,length:false,lengthFromSearch:false,previousEntries:[],nextEntries:[]}
         if(time===Number.POSITIVE_INFINITY) return gap;
         let initialSearch = this.findOverlap(time);
 
@@ -131,8 +131,16 @@ function TimeMap() {
             gap.startTime = (!gap.previousEntries) ? 0 : gap.previousEntries[0].endTime;
             gap.endTime = (!gap.nextEntries) ? false : gap.nextEntries[0].startTime;
         }
+
+        if(gap.startTime===Number.POSITIVE_INFINITY){
+            gap.startTime=false;
+            gap.endTime=false;
+            return gap;
+        }
         if(gap.endTime ===false) gap.endTime = Number.POSITIVE_INFINITY;
-        gap.length =  gap.endTime-gap.startTime;
+
+        gap.length =  Math.abs(gap.endTime-gap.startTime);
+        gap.lengthFromSearch =  Math.abs(gap.endTime-((time<gap.startTime) ? gap.startTime:time));
         
         return gap;
     }

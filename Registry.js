@@ -28,17 +28,24 @@ var AncestorRegistry = (function(){
         test(source){
             let clashing=false;
             for(const ancestorLink of source.ancestralLinks){
-                if(ancestorLink.source === this._containingUnit || ancestorLink.source === this._containingUnit.phase){
+                if(this.testLink(ancestorLink)){
+                    clashing=true;
+                    break;
+                }
+            }
+            return clashing;
+        },
+        testLink(link){
+            let clashing=false;
+                if(link.source === this._containingUnit || link.source === this._containingUnit.phase){
                     Break("Loop made it past the bracket stage",{link})
                     return false;
                 }
-                if(!this._uniqueAncestorLinks.has(ancestorLink)){
-                   if(this._registrar.test(ancestorLink)){
+                if(!this._uniqueAncestorLinks.has(link)){
+                   if(this._registrar.test(link)){
                     clashing=true;
-                    break;
                    }
                 }
-            }
             return clashing;
         },
         _uniqueAdd(link){

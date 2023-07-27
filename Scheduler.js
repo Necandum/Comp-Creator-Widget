@@ -1,4 +1,4 @@
-var Scheduler = (function () {
+ var Scheduler = (function () {
 
     function TimeSlot({ scheduledGames, absoluteCompStartTime, name, description, scheduledItem, fieldNumber, startTime, length, type }) {
         if (!Number.isInteger(fieldNumber) || fieldNumber > (scheduledGames.fields.length + 1)) Break("fieldNumber must be integer and field must exist", { fieldNumber })
@@ -39,20 +39,26 @@ var Scheduler = (function () {
         return this
     }
 
-
-    function Scheduler(comp, maxFieldNumber, absoluteCompStartTime = Date.now(), restrictions = []) {
+    // schedulerOptions{orderByBlock,orderByPriority,fieldLocations:{fieldNumber:[i,j]} }
+    //useGamesInstead ~~ array/set of games to be used instead of all the games inside a comp. Useful for various calculations. 
+    function Scheduler(comp, maxFieldNumber, absoluteCompStartTime = Date.now(), {restrictions = [],schedulerOptions={},useGamesInsted}) {
         let me = this;
         this._absoluteCompStartTime = parseInt(absoluteCompStartTime);
+        this._comp=comp;
+        this._schedulerOptions = schedulerOptions;
         this._allPhases = new Map();
-        comp.allPhasesArray.forEach(phase => this._allPhases.set(phase, false));
+        this._maxFieldNumber = maxFieldNumber;
 
         this._allGames = new Map();
         this._unscheduledGames = new Set();
         this._shortestGameTime;
-        comp.allGamesArray.forEach(game => {
+        
+        let gamesToSchedule = (useGamesInsted)? useGamesInsted: comp.allGamesArray;
+        gamesToSchedule.forEach(game => {
             this._allGames.set(game, false);
             this._unscheduledGames.add(game);
             this._shortestGameTime = (this._shortestGameTime === undefined) ? game.length : Math.min(this._shortestGameTime, game.length)
+            this._allPhases.set(game.phase,false)
         });
 
         this._readyGames = new Map();
@@ -63,7 +69,7 @@ var Scheduler = (function () {
                 let game = gameScore.game;
                 let collisionMap = new TimeMap();
                 this._registry.set(game, collisionMap);
-                let toAdd = me._scheduledGames.all.findOverlap(gameScore.startTime).entries; //find other games happening at earliest time this game could be scheduled
+                let toAdd = me._scheduledGames.all.findOverlap(gameScore.startTime-gameScore.game.length*3).entries; //find other games happening at earliest time this game could be scheduled and a little before
                 let lastFoundIndex = toAdd.at(-1)?.index ?? -1;
                 let allEntries = me._scheduledGames.all.entries()
                 for (let i = lastFoundIndex + 1; i < allEntries.length; i++) { //start from latest overlapping entry +1
@@ -73,6 +79,13 @@ var Scheduler = (function () {
                     if (entry.item.type !== e.GAME_SLOT) continue
                     this.investigateCollision(game, entry.item)
                 }
+            },
+            findCollisions(game,time){
+                let collisionMap = this._registry.get(game);
+                return collisionMap.findOverlap(time);
+            },
+            allCollisions(game,sortByStart){
+                return this._registry.get(game).entries(sortByStart);
             },
             findFreeGap(game, time) {
                 let gap;
@@ -93,7 +106,7 @@ var Scheduler = (function () {
                 return gap;
             },
             investigateCollision(game, timeSlot) {
-                if (game.testForCollision(timeSlot.scheduledItem)) {
+                if (game.testForCollision(timeSlot.scheduledItem) || game.ancestralSources.has(timeSlot.scheduledItem)) {
                     let collisionMap = this._registry.get(game)
                     collisionMap.set(timeSlot.scheduledItem, { startTime: timeSlot.startTime, endTime: timeSlot.endTime });
                 }
@@ -117,11 +130,18 @@ var Scheduler = (function () {
                 return getAvailability(this.fields);
             },
         };
+
         for (let fieldNumber = 1; fieldNumber <= maxFieldNumber; fieldNumber++) {
             this._scheduledGames.fields[fieldNumber] = new TimeMap();
             this._scheduledGames.fields[fieldNumber].restrictions = new TimeMap();
             this._scheduledGames.fields[fieldNumber].fieldNumber = fieldNumber;
             this._scheduledGames.fields[fieldNumber].nextAvailable = 0;
+            this._scheduledGames.fields[fieldNumber].location = schedulerOptions.fieldLocations?.[fieldNumber] ?? [0,0];
+            this._scheduledGames.fields[fieldNumber].distanceTo = function distanceTo(otherFieldNumber){
+                let [i1,j1]= this.location;
+                let [i2,j2] = me._scheduledGames.fields[otherFieldNumber]?.location ?? [0,0];
+                return Math.round(Math.sqrt((i1-i2)**2+(j1-j2)**2));
+            }
             for (const restriction of restrictions) {
                 if (fieldNumber >= restriction.startField && fieldNumber <= restriction.endField) {
                     if (restriction.type === e.FIELD_CLOSURE) {
@@ -207,8 +227,8 @@ var Scheduler = (function () {
             let earliestLength = [];
 
             for (let gameScore of gameScores) {
-                let priorityNum = gameScore.game.phase.currentSettings.get(e.PRIORITY);
-                let blockNum = gameScore.game.block.blockOrder;
+                let priorityNum =(this._schedulerOptions?.orderByPriority===false)? 0 : gameScore.game.phase.currentSettings.get(e.PRIORITY);
+                let blockNum = (this._schedulerOptions?.orderByBlock ===false) ? 0: gameScore.game.block.blockOrder;
                 let length = gameScore.game.length;
                 minLength[length] = (minLength[length] === undefined) ? gameScore.startTime : Math.min(gameScore.startTime, minLength[length])
 
@@ -248,11 +268,14 @@ var Scheduler = (function () {
             return newTimeSlot;
         },
         scheduleAll() {
+            comp.refreshTerminalDistance();
             console.time("Scheduling")
             let success = true;
             this.assessAllGameReadiness();
+            let count=0
             while (this._unscheduledGames.size > 0 || this._readyGames.size > 0) {
                 let rankingObject = this.rankReadyGames();
+                count++
                 if (rankingObject.periods.length === 0) {
                     success = false;
                     break
@@ -265,10 +288,19 @@ var Scheduler = (function () {
 
                 let choiceArray = [];//choice = {game: ,startTime: fieldNumber: }
                 for (const field of nextAvailable.all) {
-                    let scoringObject = this.serialScoring({ field, scoreFuncArray: [findNextValid], rankingObject });
+                    let scoringObject = this.serialScoring({ field, scoreFuncArray: [findNextValid,scrChildren,scrLargestTerminal,scrRecency,scrSameField], rankingObject });
                     if (scoringObject.choice.game) choiceArray.push(scoringObject.choice);
+                   
+                   
+                    let displayArray =[scoringObject.choice.startTime/1000]
+                    for(const gameScore of scoringObject.gameScoresByPeriod[0]){
+                        displayArray.push(`${gameScore.game.name}: ${gameScore.score}`)
+                        
+                    }
                 }
-                choiceArray.sort((a, b) => a.startTime - b.startTime)
+                let minStartTime = Math.min(...choiceArray.map(x=>x.startTime));
+                choiceArray = choiceArray.filter(x=>x.startTime===minStartTime);
+                choiceArray.sort((a,b)=>b.score-a.score)
                 if (choiceArray.length === 0) {
                     success = false;
                     break
@@ -301,7 +333,7 @@ var Scheduler = (function () {
             }
 
             if (scoringObject.gameScoresByPeriod.length > 0) {
-                scoringObject.choice = Array.from(scoringObject.gameScoresByPeriod[0]).sort((a, b) => a.startTime - b.startTime)[0]
+                scoringObject.choice = Array.from(scoringObject.gameScoresByPeriod[0]).sort((a, b) => b.score- a.score)[0]
             }
             scoringObject.choice.fieldNumber = field.fieldNumber;
             return scoringObject;
@@ -330,9 +362,6 @@ var Scheduler = (function () {
     Scheduler.TimeSlot = TimeSlot;
     Scheduler.Restriction = Restriction;
 
-
-
-
     function getAvailability(fields) {
         let availability = { fieldNumber: false, time: false, field: false, all: [] };
         for (const field of fields) {
@@ -348,82 +377,6 @@ var Scheduler = (function () {
         availability.time = availability.field.nextAvailable;
         return availability;
     }
-
-    function fuckError(scoringObject, scheduler, field) {
-
-        let gap = field.findGap(field.nextAvailable);
-        let currentStartTime = Math.max(gap.startTime, field.nextAvailable);
-        let currentGapLength = gap.endTime - currentStartTime;
-        gapSearch: while (gap.startTime !== false && gap.startTime !== Number.POSITIVE_INFINITY) {
-            let nextSearchTime = gap.endTime;
-            //Ensure first gap found can fit *any* game in the comp. If not, close the gap and find another one that can. If no one can, close field. 
-            if (gap.length < scheduler._shortestGameTime) {
-                let newRestriction = Scheduler.Restriction(field.fieldNumber, field.fieldNumber, gap.startTime, gap.endTime, e.FIELD_CLOSURE, "Closed by Computer", "Not enough of a gap for any game in competition")
-                scheduler._scheduledGames.closeField(newRestriction, field.fieldNumber)
-                field.nextAvailable = TimeMap.sortByEnd(gap.nextEntries).at(-1).endTime ?? false;
-                if (field.nextAvailable === false) { //If field closed, reject all potential games. Field will not assessed for use again. 
-                    for (const periodSet of scoringObject.gameScoresByPeriod) {
-                        for (const gameScore of periodSet) {
-                            gameScore.score = false;
-                            gameScore.reason = "Field no longer has capacity"
-                            scoringObject.invalidGames.push(gameScore);
-                        }
-                    }
-                    scoringObject.gameScoresByPeriod.length = 0;
-                    return scoringObject;
-                }
-            } else {
-                //Find if *any* game that is ready can fit in this gap, by re: length and readiness. If one can, break. If not, find next gap with nil temp closure. 
-                let nextValidTime = Number.POSITIVE_INFINITY;
-                let anythingFits = false;
-
-                for (const earliest of scoringObject.earliestLength) {
-                    let fit = earliest.length <= currentGapLength;
-                    let valid = earliest.readyTime <= currentStartTime
-
-                    if (earliest.readyTime > currentStartTime) nextValidTime = Math.min(nextValidTime, earliest.readyTime);
-                    if (fit && !valid) {
-                        anythingFits = true;
-                    }
-                    if (fit && valid) {
-                        break gapSearch;
-                    }
-                }
-                if (anythingFits) {
-                    nextSearchTime = Math.min(nextValidTime, gap.endTime);
-                } else {
-                    nextSearchTime = gap.endTime;
-                }
-            }
-
-            gap = field.findGap(nextSearchTime);
-            currentStartTime = Math.max(gap.startTime, field.nextAvailable, nextSearchTime);
-            currentGapLength = gap.endTime - currentStartTime;
-        }
-
-        for (let i = 0; i < scoringObject.gameScoresByPeriod.length; i++) {
-            let period = scoringObject.gameScoresByPeriod[i];
-            for (const gameScore of period) {
-                let fit = gameScore.game.length <= currentGapLength;
-                let readyInTime = gameScore.startTime <= currentStartTime;
-                if (fit && readyInTime) {
-                    gameScore.startTime = Math.max(gameScore.startTime, currentStartTime);
-                    continue;
-                } else {
-                    gameScore.score = false;
-                    gameScore.reason = `Game ${(!readyInTime) ? "was not valid at current time" : ""} ${(!fit && !readyInTime) ? " and " : ""}${(!fit) ? "could not fit in available gap" : ""}`;
-                    scoringObject.invalidGames.push(gameScore);
-                    period.delete(gameScore);
-                    if (period.size === 0) {
-                        scoringObject.gameScoresByPeriod.splice(i, 1);
-                        i--
-                    }
-                }
-            }
-        }
-        return scoringObject;
-    }
-
     function findNextValid(scoringObject, scheduler, field) {
         let gap = field.findGap(field.nextAvailable);
         let currentStartTime = Math.max(gap.startTime, field.nextAvailable);
@@ -523,86 +476,59 @@ var Scheduler = (function () {
                     scoringObject.gameScoresByPeriod.length = 0;
                 }
     }
-
-    // function enoughTime(scoringObject,scheduler,field){
-    //     let gap = field.findGap(field.nextAvailable)
-    //     let minCompLength = scheduler._shortestGameTime;
-    //     while(gap.startTime!==false && gap.startTime !== Number.POSITIVE_INFINITY){
-    //         if(gap.length>=scoringObject.minRankedLength){ //gap will fit at least one game
-    //             for(let i = 0;i< scoringObject.gameScoresByPeriod.length;i++){
-    //                 const periodSet = scoringObject.gameScoresByPeriod[i];
-    //                 for(const gameScore of periodSet){
-    //                     gameScore.startTime = gap.startTime;
-    //                     if(gameScore.game.length>gap.length){
-    //                         gameScore.score=false;
-    //                         gameScore.reason = "Too big for current gap";
-    //                         scoringObject.invalidGames.push(gameScore);
-    //                         periodSet.delete(gameScore);
-    //                         if (periodSet.size===0){
-    //                             scoringObject.gameScoresByPeriod.splice(i,1);
-    //                             i--
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //             return scoringObject;
-    //         } else if (gap.length<minCompLength){ //gap will not fit any game in the comp
-    //             let newRestriction = Scheduler.Restriction(field.fieldNumber,field.fieldNumber,gap.startTime,gap.endTime,e.FIELD_CLOSURE,"Closed by Computer","Not enough of a gap for any game in competition")
-    //             scheduler._scheduledGames.closeField(newRestriction,field.fieldNumber)
-    //             field.nextAvailable = (gap.nextEntries[0].endTime===Number.POSITIVE_INFINITY) ? false: gap.nextEntries[0].endTime;
-    //             return scoringObject;
-    //         } 
-    //     gap = field.findGap(gap.endTime);
-    //     }
-    //     //if no gap that will fit, fail all, return
-    //     for(const periodSet of scoringObject.gameScoresByPeriod){
-    //         for(const gameScore of periodSet){
-    //             gameScore.score = false;
-    //             gameScore.reason = "Field no longer has capacity"
-    //             scoringObject.invalidGames.push(gameScore);
-    //         }
-    //     }
-    //     scoringObject.gameScoresByPeriod.length=0;
-    //     return scoringObject;
-    // }
-
-    // function checkValidity(scoringObject,scheduler,field){
-    //     for(let i = 0;i< scoringObject.gameScoresByPeriod.length;i++){
-    //                 const periodSet = scoringObject.gameScoresByPeriod[i];
-    //                 for(const gameScore of periodSet){
-    //                     let validForCurrentTime=true;
-    //                     for(const inLink of gameScore.game){
-    //                         if(inLink.source instanceof Team) continue;
-    //                         if(inLink.source instanceof Game){
-    //                             if(scheduler._allGames.get(inLink.source)>gameScore.startTime){
-    //                                 validForCurrentTime = false;
-    //                                 break;
-    //                             }
-    //                         }
-    //                         if(inLink.source instanceof Phase){
-    //                             if(scheduler._allPhases.get(inLink.source)>gameScore.startTime){
-    //                                 validForCurrentTime = false;
-    //                                 break;
-    //                             }
-    //                         }
-    //                     }
-    //                         if(!validForCurrentTime){
-    //                         gameScore.score=false;
-    //                         gameScore.reason = "Not all sources actually finished at this time.";
-    //                         scoringObject.invalidGames.push(gameScore);
-    //                         periodSet.delete(gameScore);
-    //                         if (periodSet.size===0){
-    //                             scoringObject.gameScoresByPeriod.splice(i,1);
-    //                             i--
-    //                         }
-    //                     }
-    //                 }
-    //                 }
-
-    // } 
-
-
-
+    function scrChildren(scoringObject,scheduler,field){
+        
+        for(const gameScore of scoringObject.gameScoresByPeriod[0]){
+            gameScore.score+=scheduler._comp.getChildCount(gameScore.game);
+            if(gameScore.game.outgoingLinks.length===2 && (gameScore.game.outgoingLinks[0].target !== gameScore.game.outgoingLinks[1].target)) gameScore.score*=1.1;
+        }
+    return scoringObject
+    }
+    function scrLargestTerminal(scoringObject,scheduler,field){
+        for(const gameScore of scoringObject.gameScoresByPeriod[0]){
+            gameScore.score+=scheduler._comp.getLargestTerminal(gameScore.game);
+        }
+        return scoringObject;
+    }
+    function scrRecency (scoringObject,scheduler,field){
+        let recencyThreshold = 20*60*1000;
+        let pointCost = 100;
+        for(const gameScore of scoringObject.gameScoresByPeriod[0]){
+            for(const inLink of gameScore.game.incomingLinks){
+                if(inLink.source instanceof Team) continue;
+                if((gameScore.startTime - scheduler._scheduledGames.index.get(inLink.source).endTime) < recencyThreshold){ //20min
+                    gameScore.score-=pointCost
+                }
+            }
+                let collisionResult = scheduler._collisionChecker.findCollisions(gameScore.game,gameScore.startTime - recencyThreshold)
+                if(collisionResult.match === true || collisionResult.nextEntries?.[0]?.startTime < gameScore.startTime){
+                    gameScore.score-=pointCost/2 //half above, as only probability of collision, not certainty. 
+                }
+            }
+    return scoringObject
+    }
+    function scrSameField(scoringObject,scheduler,field){
+        
+        for(const gameScore of scoringObject.gameScoresByPeriod[0]){
+            let collidingGameEntries = scheduler._collisionChecker.allCollisions(gameScore.game,true);
+            collidingGameEntries.sort((a,b)=>b.endTime-a.endTime)
+            let count = 4;
+            for(const collidingGameEntry of collidingGameEntries){
+                if(count===0) break;
+                count--;
+                const collidingGame = collidingGameEntry.item;
+                const collidingGameFieldNumber = scheduler._scheduledGames.index.get(collidingGame).fieldNumber;
+                const timeMultiplier = (gameScore.startTime - collidingGameEntry.endTime)/gameScore.game.length;
+                const travelTime = field.distanceTo(collidingGameFieldNumber)/1000
+                let posScore = 20/(timeMultiplier**2);
+                posScore = Math.trunc(posScore*10)/10
+                let  negScore =-1*Math.floor(travelTime/30)
+                negScore = Math.trunc(negScore*10)/10
+                gameScore.score += (collidingGameFieldNumber===field.fieldNumber) ? posScore:negScore;
+           }
+        }
+        return scoringObject;
+    }
 
     return Scheduler
 })()

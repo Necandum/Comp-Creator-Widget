@@ -13,6 +13,7 @@ var Game = (function () {
         defineGetter({ obj: this, name: "outgoingLinks", func: () => Array.from(links.keys()).filter((cv) => cv.source === this) });
         defineGetter({ obj: this, name: "incomingLinks", func: () => Array.from(links.keys()).filter((cv) => cv.target === this) });
         defineGetter({ obj: this, name: "ancestralLinks", func: () => ancestralLinksRegistrar.ancestralLinks });
+        defineGetter({ obj: this, name: "ancestralSources", func: () => new Set(ancestralLinksRegistrar.registry.keys()) });
         defineGetter({ obj: this, name: "block", func: () => parent });
         defineGetter({ obj: this, name: "phase", func: () => parent.parent });
         defineGetter({ obj: this, name: "gameOrder", func: () => parent.allGamesArray.indexOf(this)+1 });
@@ -52,6 +53,9 @@ var Game = (function () {
         }
         this.testForCollision= function testForCollision(game){
             return ancestralLinksRegistrar.test(game);
+        }
+        this.testLinkForCollision= function testLinkForCollision(link){
+            return ancestralLinksRegistrar.testLink(link);
         }
         this.removeLink = function removeLink(link) {
             if (!(link instanceof Link)) Break("Only Links can be so removed. ",{link});

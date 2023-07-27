@@ -119,6 +119,31 @@ setLink(games[2][2][2], { index: 1, source: games[1][1][2],sourceRank:2 })
 setLink(games[2][3][1], { index: 0, source: games[1][2][1],sourceRank:1 })
 setLink(games[2][3][1], { index: 1, source: games[1][2][2],sourceRank:1 })
 
+//Infinite Phases
+let currentPhase = 3;
+let maxPhase = 2;
+//Infinite Phase New 
+for(currentPhase;currentPhase<=maxPhase;currentPhase++){
+newPhase({phaseType:e.TOURNAMENT,name:`Tour ${currentPhase}`})
+newGame(blocks[currentPhase][1])
+newBlock(phases[currentPhase])
+newGame(blocks[currentPhase][2])
+
+setLink(games[currentPhase][1][1], { index: 0, source: teams[5] })
+setLink(games[currentPhase][1][1], { index: 1, source: teams[6] })
+setLink(games[currentPhase][1][2], { index: 0, source: teams[7] })
+setLink(games[currentPhase][1][2], { index: 1, source: teams[8] })
+
+setLink(games[currentPhase][2][1], { index: 0, source: games[currentPhase][1][1],sourceRank:1 })
+setLink(games[currentPhase][2][1], { index: 1, source: games[currentPhase][1][1],sourceRank:2 })
+setLink(games[currentPhase][2][2], { index: 0, source: games[currentPhase][1][2],sourceRank:1 })
+setLink(games[currentPhase][2][2], { index: 1, source: games[currentPhase][1][2],sourceRank:2 })
+}
+
+
+
+
+
 Verification.unPause();
 
 var testingRestrictions=[new Scheduler.Restriction(0,2,35*60*1000,45*60*1000,e.FIELD_CLOSURE,"Field Closed","Bugger Off")];

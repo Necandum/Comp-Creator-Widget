@@ -97,7 +97,6 @@ var Phase = (function () {
 
             let maxPossibleTeams=Array.from(this.ancestralLinks).filter(x=>x.source instanceof Team).length; 
                 this.outgoingLinks.forEach((outLink) => {
-                    console.log(outLink.sourceRank,maxPossibleTeams)
                 if(outLink.sourceRank > maxPossibleTeams) {
                     new Objection(outLink.target,[outLink],Objection.NotEnoughTeams,this)
                     testValidity.fail(Objection.NotEnoughTeams)

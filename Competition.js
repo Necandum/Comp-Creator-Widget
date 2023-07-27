@@ -9,7 +9,10 @@ var Competition = (function () {
         let settings = new Map([])
         let phases = [];
         let associatedDivFlesh;
-
+        // this._childCounter = new Map();
+        this._terminalDistance = new Map();
+        this._stageRecorder = new Map();
+        this._pureStages = new Map();
         defineGetter({ obj: this, name: "name", func: () => name });
         defineGetter({ obj: this, name: "id", func: () => myId });
         defineGetter({ obj: this, name: "currentSettings", func: () => mapToObjectArray(settings, "setting", "value") });
@@ -26,15 +29,115 @@ var Competition = (function () {
 
         this.removePhase = function (phase) {
             if (!(phase instanceof Phase)) throw new Error("Not a phase");
-            let phaseIndex;
+            let phaseIndex; 
             if ((phaseIndex = phases.indexOf(phase)) === -1) throw new Error("No such phase in this Competetion");
             phases.splice(phaseIndex);
             if (phase.parent !== null) phase.removeParent();
         }
-
+        this.getChildCount=function(unit){
+            return this._terminalDistance.get(unit).size-1;
+        }
+        this.getLargestTerminal=function (unit){
+            let largest=0;
+            this._terminalDistance.get(unit).forEach((terminalCount,game)=>{
+                largest=Math.max(largest,terminalCount);
+            })
+            return largest;
+        }
+        // this.refreshChildCounter = function(){
+        //     console.time("counterChild")
+        //     let games = this.allGamesArray;
+        //     this._childCounter = new Map();
+        //     for(let i = games.length-1;i>=0;i--){
+        //         this._countChildren(games[i]);
+        //     }
+        //     console.timeEnd("counterChild")
+        //     return this._childCounter
+        // }
+        // this._countChildren=function(unit){   
+        //     this._childCounter.set(unit,new Set());
+        //     for(const outLink of unit.outgoingLinks){
+        //         let childUnit = outLink.target
+        //         if(!this._childCounter.has(childUnit)) this._countChildren(childUnit);
+        //         this._childCounter.set(unit,new Set([...this._childCounter.get(unit),childUnit,...this._childCounter.get(childUnit)]));
+        //     }
+        //     if(unit instanceof Game){
+        //     let phase = unit.phase;
+        //     if(!this._childCounter.has(phase)) this._countChildren(phase);
+        //         this._childCounter.set(unit,new Set([...this._childCounter.get(unit),...this._childCounter.get(phase)]));}
+        // }
+        this.refreshTerminalDistance = function(){
+            console.time("Terminal Distance")
+            let games = this.allGamesArray;
+            this._terminalDistance = new Map();
+            for(let i = games.length-1;i>=0;i--){
+               if(games[i].outgoingLinks.length===0) this._propogateTerminalCount(games[i]);
+            }
+            console.timeEnd("Terminal Distance")
+            return {terminalDistance:this._terminalDistance,stages:this._stageRecorder}
+        }
+        this._propogateTerminalCount = function(game){
+            if(game instanceof Team) return;
+            this._recordTerminalDistance(game,0,game);
+            this._addToStage(game,0,game);
+            let currentRecord = this._terminalDistance.get(game);
+             for(const inLink of game.incomingLinks){
+                currentRecord.forEach((terminalCount,terminalGame)=>{
+                    this._recordTerminalDistance(inLink.source,terminalCount+1,terminalGame)
+                    this._addToStage(inLink.source,terminalCount+1,terminalGame)
+                })
+                if(inLink.source instanceof Phase){
+                    for(const phaseGame of inLink.source.allGamesInPhase){
+                        currentRecord.forEach((terminalCount,terminalGame)=>{
+                            this._recordTerminalDistance(phaseGame,terminalCount+1,terminalGame)
+                        });
+                        this._propogateTerminalCount(phaseGame);
+                    }
+                } else { 
+                    this._propogateTerminalCount(inLink.source);
+                }
+             }
+        }
+        this._recordTerminalDistance =function(game,distance,terminalGame){
+            if(!this._terminalDistance.has(game)) this._terminalDistance.set(game,new Map());
+            distance = Math.max(distance,this._terminalDistance.get(game)?.get(terminalGame) ?? 0);
+            this._terminalDistance.get(game).set(terminalGame,distance);
+        }
+        this._addToStage = function(game,distance,terminalGame){
+            if(!this._stageRecorder.has(terminalGame)) this._stageRecorder.set(terminalGame,[]);
+            let stageArray = this._stageRecorder.get(terminalGame)
+            if(!stageArray[distance]) stageArray[distance]=new Set();
+            stageArray[distance].add(game);
+        }
+        this._calculatePureStages = function(){
+            for(const [game,draftStageArray]  of this._stageRecorder){
+                let pureStageArray = [];
+                this._pureStages.set(game,pureStageArray)
+                for(const stage of draftStageArray){
+                    let gameStage = new Set();
+                    let phaseStages = [];
+                    for(const unit of stage){
+                        if(unit instanceof Team) continue;
+                        if(unit instanceof Game) gameStage.add(game);
+                        if(unit instanceof Phase){
+                            for(const block of unit.allBlocksArray){
+                                let blockStage= new Set();
+                                for(const blockGame of block.allGamesArray){
+                                    blockStage.add(blockGame);
+                                }
+                                phaseStages.push(blockStage);
+                            }
+                        }
+                    }
+                    if(phaseStages.length>0) {
+                        gameStage = new Set([...gameStage,...phaseStages.at(-1)])
+                        phaseStages.splice(-1,1);
+                    }
+                    pureStageArray.push(gameStage,...phaseStages);
+                }
+            }
+        }
     }
-
-
     return Competition
 })()
 

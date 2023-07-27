@@ -335,7 +335,7 @@
             if (scoringObject.gameScoresByPeriod.length > 0) {
                 scoringObject.choice = Array.from(scoringObject.gameScoresByPeriod[0]).sort((a, b) => b.score- a.score)[0]
             }
-            console.log(Array.from(scoringObject.gameScoresByPeriod[0]).map(x=>`${x.game.name}: ${x.score}`))
+            // console.log(Array.from(scoringObject.gameScoresByPeriod[0]).map(x=>`${x.game.name}: ${x.score}`))
             scoringObject.choice.fieldNumber = field.fieldNumber;
             return scoringObject;
         },

@@ -335,6 +335,7 @@
             if (scoringObject.gameScoresByPeriod.length > 0) {
                 scoringObject.choice = Array.from(scoringObject.gameScoresByPeriod[0]).sort((a, b) => b.score- a.score)[0]
             }
+            console.log(Array.from(scoringObject.gameScoresByPeriod[0]).map(x=>`${x.game.name}: ${x.score}`))
             scoringObject.choice.fieldNumber = field.fieldNumber;
             return scoringObject;
         },
@@ -491,18 +492,30 @@
         return scoringObject;
     }
     function scrRecency (scoringObject,scheduler,field){
-        let recencyThreshold = 20*60*1000;
-        let pointCost = 100;
+
+        let recencyArray = [
+            {gameLengthMultiple:0.5,pointCost:1000},
+            {gameLengthMultiple:1,pointCost:500},
+            {gameLengthMultiple:2,pointCost:1},
+            {gameLengthMultiple:3,pointCost:-20},
+            {gameLengthMultiple:Number.POSITIVE_INFINITY,pointCost:-5}
+        ]
         for(const gameScore of scoringObject.gameScoresByPeriod[0]){
-            for(const inLink of gameScore.game.incomingLinks){
-                if(inLink.source instanceof Team) continue;
-                if((gameScore.startTime - scheduler._scheduledGames.index.get(inLink.source).endTime) < recencyThreshold){ //20min
-                    gameScore.score-=pointCost
-                }
-            }
-                let collisionResult = scheduler._collisionChecker.findCollisions(gameScore.game,gameScore.startTime - recencyThreshold)
-                if(collisionResult.match === true || collisionResult.nextEntries?.[0]?.startTime < gameScore.startTime){
-                    gameScore.score-=pointCost/2 //half above, as only probability of collision, not certainty. 
+            // for(const inLink of gameScore.game.incomingLinks){ //if direct parent end less than half a game time previously, maximum penalty
+            //     if(inLink.source instanceof Team) continue;
+            //     if((gameScore.startTime - scheduler._scheduledGames.index.get(inLink.source).endTime) < recencyArray[0].gameLengthMultiple*gameScore.game.length){ 
+            //         gameScore.score-=recencyArray[0].pointCost;
+            //     }
+            // }
+                let collidingGameEntries =  scheduler._collisionChecker.allCollisions(gameScore.game,true);
+                for(const collidingGameEntry of collidingGameEntries){
+                    let timeDifference = (gameScore.startTime - collidingGameEntry.endTime)/gameScore.game.length;
+                        for(const penalty of recencyArray){
+                            if(timeDifference<penalty.gameLengthMultiple){
+                                gameScore.score-=penalty.pointCost;
+                                break;
+                            }
+                        }
                 }
             }
     return scoringObject
@@ -518,7 +531,7 @@
                 count--;
                 const collidingGame = collidingGameEntry.item;
                 const collidingGameFieldNumber = scheduler._scheduledGames.index.get(collidingGame).fieldNumber;
-                const timeMultiplier = (gameScore.startTime - collidingGameEntry.endTime)/gameScore.game.length;
+                const timeMultiplier = (gameScore.startTime - collidingGameEntry.endTime)/gameScore.game.length+1;
                 const travelTime = field.distanceTo(collidingGameFieldNumber)/1000
                 let posScore = 20/(timeMultiplier**2);
                 posScore = Math.trunc(posScore*10)/10

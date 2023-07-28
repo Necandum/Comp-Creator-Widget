@@ -343,16 +343,12 @@
             let fields = this._scheduledGames.fields;
 
             let simplifiedFieldSchedule = [];
+            simplifiedFieldSchedule.index=new Map();
             for (let i = 1; i < fields.length; i++) {
                 simplifiedFieldSchedule[i] = [];
                 for (const timeSlot of fields[i]) {
-                    simplifiedFieldSchedule[i].push({
-                        scheduledItem: timeSlot.scheduledItem,
-                        name: timeSlot.name,
-                        description: timeSlot.description,
-                        absoluteStartTime: timeSlot.absoluteStartTime,
-                        fieldNumber: timeSlot.fieldNumber
-                    })
+                    simplifiedFieldSchedule[i].push(timeSlot)
+                    simplifiedFieldSchedule.index.set(timeSlot.scheduledItem,timeSlot)
                 }
             }
             return simplifiedFieldSchedule

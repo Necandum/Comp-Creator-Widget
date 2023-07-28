@@ -79,7 +79,7 @@ function setLink(game, { index = 0, source,sourceRank=1 }) {
     sourceSelect.dispatchEvent(mEvent.input)
 }
 Verification.pause();
-newPhase({phaseType:e.TOURNAMENT,name:"T"})
+newPhase({phaseType:e.TOURNAMENT,name:"T"}).changeSetting(e.SUPPORT_TEAMS,new Set([...Team.allTeams.values()]));
 newGame(blocks[1][1])
 newBlock(phases[1])
 newGame(blocks[1][2])

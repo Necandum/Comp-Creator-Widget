@@ -18,7 +18,10 @@ var e = {
         SEED:"seed",
         GAME_VALIDITY:"gameValidity",
         FIELD_CLOSURE:"fieldClosure",
-        GAME_SLOT:"gameSlot"
+        GAME_SLOT:"gameSlot",
+        SUPPORT_TEAMS:"supportTeams",
+        SUPPORT_SELECTION:"supportSelection",
+        PLAYER:"player",
 }
 
 

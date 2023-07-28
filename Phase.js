@@ -10,6 +10,8 @@ var Phase = (function () {
                 { label: "Game", playTime: true, playerAvailable: false, endAtMiliSecond: 20*60*1000 },
                 { label: "Change-Over", playTime: false, playerAvailable: true, endAtMiliSecond: 30*60*1000 }
             ]],
+            [e.SUPPORT_TEAMS,new Set()],
+            [e.SUPPORT_SELECTION,e.PREDETERMINED] //e.PREDETERMINED or e.TOURNAMENT
         ])
         let blocks = [];
         let divisions = [];
@@ -27,7 +29,7 @@ var Phase = (function () {
         defineGetter({ obj: this, name: "parent", func: () => parent });
         defineGetter({
             obj: this, name: "currentSettings", func: () => {
-                let newMap = new Map(Array.from(settings))
+                let newMap = new Map(settings)
                 let newGameStages = deepCopyArrayOfObjects(newMap.get(e.GAME_STAGES));
                 newMap.set(e.GAME_STAGES, newGameStages)
                 return newMap;
@@ -144,6 +146,9 @@ var Phase = (function () {
                 case e.PHASE_TYPE:
                     if (newValue !== e.ROUND_ROBIN && newValue !== e.TOURNAMENT) throw new Error("Must be a round robin or tournament")
                     settings.set(setting, newValue);
+                    break;
+                case e.SUPPORT_TEAMS:
+                    settings.set(e.SUPPORT_TEAMS,newValue);
                     break;
                 default:
                     throw new Error("Not an existing setting");

@@ -32,6 +32,7 @@ var Phase = (function () {
                 let newMap = new Map(settings)
                 let newGameStages = deepCopyArrayOfObjects(newMap.get(e.GAME_STAGES));
                 newMap.set(e.GAME_STAGES, newGameStages)
+                newMap.set(e.SUPPORT_TEAMS,new Set(newMap.get(e.SUPPORT_TEAMS)))
                 return newMap;
             }
         });

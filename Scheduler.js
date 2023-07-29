@@ -4,6 +4,7 @@
         if (!Number.isInteger(fieldNumber) || fieldNumber > (scheduledGames.fields.length + 1)) Break("fieldNumber must be integer and field must exist", { fieldNumber })
         if (!(scheduledGames.index instanceof Map)) Break("scheduledGames must be the _scheduledGames of the relevant Scheduler", { scheduledGames });
         let field = scheduledGames.fields[fieldNumber];
+        let supportRoles = new Map();
 
         defineGetter({ obj: this, name: "prev", func: () => field[this.fieldIndex - 1] });
         defineGetter({ obj: this, name: "next", func: () => field[this.fieldIndex + 1] });
@@ -18,7 +19,13 @@
         defineGetter({ obj: this, name: "name", func: () => name });
         defineGetter({ obj: this, name: "description", func: () => description });
         defineGetter({ obj: this, name: "type", func: () => type });
+        defineGetter({ obj: this, name: "supportRoles", func: () => new Map(supportRoles)});
 
+        this.setSupportRole = function(role,team){
+            supportRoles.set(role,team);
+
+            console.log(role,team?.name??"Null")
+        }
         scheduledGames.index.set(scheduledItem, this);
         scheduledGames.all.set(this, { startTime: this.startTime, endTime: this.endTime })
         field.set(this, { startTime: this.startTime, endTime: this.endTime });

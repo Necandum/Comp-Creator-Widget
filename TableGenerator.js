@@ -436,7 +436,7 @@ var TableGenerator = (function TableGeneratorBuilder(comp) {
             let scheduling = new Scheduler(comp, maxField, startDate.getTime(),{restrictions:testingRestrictions,schedulerOptions:{orderByBlock:false}})
             scheduling.scheduleAll(); oLog.schedule=scheduling;
             let simpleSchedule = scheduling.getFieldSchedule();
-            oLog.supportSchedule = new SupportScheduler(comp,simpleSchedule).__phaseRegistry.values().next().value
+            oLog.supportSchedule = new SupportScheduler(comp,simpleSchedule)
             this.elder['table'].quickSave("csv", { team: CSVGenerator.teamCSV(), draw: CSVGenerator.drawCSV(simpleSchedule) });
             for (let i = 1; i < simpleSchedule.length; i++) {
                 let fieldContainer = TableGenerator.scheduleTable.fieldContainer.build(fieldOrganiser);

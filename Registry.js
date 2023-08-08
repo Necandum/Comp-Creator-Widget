@@ -144,13 +144,6 @@ function createEntryBySourceRank(registry,link){
     return newEntry;
 }
 
-function createEntryBySourceRankSeed(registry,link){
-    if(!(registry instanceof Map) || !(link instanceof Link)) Break("registry must be a Map, link must be a Link",{registry,link});
-    let newEntry = EntryCreator(["source","sourceRank","seed"],Array)(registry,link);
-        newEntry["cap"].push(link)
-    return newEntry;
-}
-
 function EntryCreator(propList,capConstructor){
     return function makingEntry(baseMap,newItem){
         if(!(baseMap instanceof Map)) Break("baseMap must be a Map",{baseMap,newItem});

@@ -38,13 +38,14 @@ var AncestorRegistry = (function(){
         testLink(link){
             let clashing=false;
                 if(link.source === this._containingUnit || link.source === this._containingUnit.phase){
-                    Break("Loop made it past the bracket stage",{link})
-                    return false;
+                    clashing=true;
+                    return clashing;
                 }
                 if(!this._uniqueAncestorLinks.has(link)){
                    if(this._registrar.test(link)){
                     clashing=true;
                    }
+                //    if(this._containingUnit.id==8) {console.log("clashing",clashing,this._registrar.registry,link)}
                 }
             return clashing;
         },
@@ -138,7 +139,7 @@ return uniqueSourceRankRegistry
 
 
 function createEntryBySourceRank(registry,link){
-    if(!(registry instanceof Map) || !(link instanceof Link)) Break("registry must be a Map, link must be a Link",{registry,link});
+    if(!(registry instanceof Map) || !(link instanceof Link || link.hasOwnProperty("source"))) Break("registry must be a Map, link must be a Link",{registry,link});
     let newEntry = EntryCreator(["source","sourceRank"],Array)(registry,link);
        newEntry["cap"].push(link)
     return newEntry;

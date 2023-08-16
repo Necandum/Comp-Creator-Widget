@@ -13,6 +13,7 @@
         defineGetter({ obj: this, name: "fieldNumber", func: () => parseInt(fieldNumber) });
         defineGetter({ obj: this, name: "startTime", func: () => parseInt(startTime) });
         defineGetter({ obj: this, name: "absoluteStartTime", func: () => { return parseInt(startTime) + parseInt(absoluteCompStartTime) } });
+        defineGetter({ obj: this, name: "absoluteCompStartTime", func: () => { return parseInt(absoluteCompStartTime) } });
         defineGetter({ obj: this, name: "endTime", func: () => this.startTime + this.length });
         defineGetter({ obj: this, name: "length", func: () => length });
         defineGetter({ obj: this, name: "scheduledItem", func: () => scheduledItem });
@@ -23,7 +24,6 @@
 
         this.setSupportRole = function(role,team){
             supportRoles.set(role,team);
-
             console.log(role,team?.name??"Null")
         }
         scheduledGames.index.set(scheduledItem, this);
@@ -132,7 +132,7 @@
             all: new TimeMap(),
             fields: [],
             insert(game, fieldNumber, time) { return new GameSlot(game, fieldNumber, time) },
-            closeField(restriction, fieldNumber) { return new ClosureSlot(restriction, fieldNumber) },
+            closeField(restriction, fieldNumber) {return new ClosureSlot(restriction, fieldNumber) },
             getNextAvailable() {
                 return getAvailability(this.fields);
             },
@@ -353,6 +353,7 @@
             simplifiedFieldSchedule.index=new Map();
             for (let i = 1; i < fields.length; i++) {
                 simplifiedFieldSchedule[i] = [];
+                let c = 0;
                 for (const timeSlot of fields[i]) {
                     simplifiedFieldSchedule[i].push(timeSlot)
                     simplifiedFieldSchedule.index.set(timeSlot.scheduledItem,timeSlot)
@@ -390,7 +391,7 @@
             
             timeEvaluation: {
                 if (gap.length < scheduler._shortestGameTime) {
-                    let newRestriction = Scheduler.Restriction(field.fieldNumber, field.fieldNumber, gap.startTime, gap.endTime, e.FIELD_CLOSURE, "Closed by Computer", "Not enough of a gap for any game in competition")
+                    let newRestriction = new Scheduler.Restriction(field.fieldNumber, field.fieldNumber, gap.startTime, gap.endTime, e.FIELD_CLOSURE, "Closed by Computer", "Not enough of a gap for any game in competition")
                     scheduler._scheduledGames.closeField(newRestriction, field.fieldNumber)
                     field.nextAvailable = TimeMap.sortByEnd(gap.nextEntries).at(-1).endTime;
                     if (field.nextAvailable === Number.POSITIVE_INFINITY) { //If field closed, reject all potential games. Field will not assessed for use again. 

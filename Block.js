@@ -41,7 +41,12 @@ var Block = (function () {
             this.incomingLinks.forEach(iLink=>this.addAncestralLink(iLink));
             return true; 
         }
-
+        this.hasIncomingLink= function hasIncomingLink(link){
+            for(const inLink of this.incomingLinks){
+                if(inLink.source===link.source && inLink.sourceRank===link.sourceRank) return true
+            }
+            return false
+        }
         this.verifyLinks=function verifyLinks(){
             let testValidity = new ValidityTracker(true);
             Verification.revokeAllObjections(this);

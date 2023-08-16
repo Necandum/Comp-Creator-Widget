@@ -87,7 +87,7 @@ newBlock(phases[1])
 
 
 
-newPhase({phaseType:e.ROUND_ROBIN,name:"RR"})
+newPhase({phaseType:e.ROUND_ROBIN,name:"RR"}).changeSetting(e.SUPPORT_SELECTION,e.TOURNAMENT)
 newGame(blocks[2][1])
 newBlock(phases[2])
 newGame(blocks[2][2])

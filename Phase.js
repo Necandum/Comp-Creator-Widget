@@ -151,6 +151,10 @@ var Phase = (function () {
                 case e.SUPPORT_TEAMS:
                     settings.set(e.SUPPORT_TEAMS,newValue);
                     break;
+                case e.SUPPORT_SELECTION:
+                    if(newValue!==e.PREDETERMINED && newValue!==e.TOURNAMENT) Break("Must either be e.PREDETERMINED or e.TOURNAMENT",{newValue})
+                    settings.set(e.SUPPORT_SELECTION,newValue);
+                    break;
                 default:
                     throw new Error("Not an existing setting");
             }

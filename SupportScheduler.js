@@ -60,31 +60,37 @@ var SupportScheduler = (function () {
             if (!this.get(phase).has(team)) this.get(phase).set(team, roleMap)
             return true;
         }
-        clashRegistry.addCommitment = function addCommitment(team, timeSlot, role) {
-            if (!this.has(team)) this.set(team, new TimeMap())
-            this.get(team).set({ game: timeSlot.scheduledItem, role }, { startTime: timeSlot.startTime, endTime: timeSlot.endTime })
+        clashRegistry.addCommitment = function addCommitment(teamReference, timeSlot, role) {
+            let clashMap = this.getTimeMap(teamReference);
+            clashMap.set({ game: timeSlot.scheduledItem, role }, { startTime: timeSlot.startTime, endTime: timeSlot.endTime })
             return true
         }
-        clashRegistry.induction = function induction(team) {
-            if (clashRegistry.has(team)) return false;
+        clashRegistry.induction = function induction(teamReference) {
+            if(teamReference?.source instanceof Team) teamReference = teamReference.source
+            if (clashRegistry.has(teamReference)) return false;
             let role = e.PLAYER;
-            if(team instanceof Team){
+            if(teamReference instanceof Team){
                 for (const [game, timeSlot] of simplifiedFieldSchedule.index.entries()) {
                     if (!(game instanceof Game)) continue;
-                    if (game.ancestralSources.has(team)) {
-                        clashRegistry.addCommitment(team, timeSlot, role)
+                    if (game.ancestralSources.has(teamReference)) {
+                        clashRegistry.addCommitment(teamReference, timeSlot, role)
                     }
                 }
             } else {
                 for (const [game, timeSlot] of simplifiedFieldSchedule.index.entries()) {
                     if (!(game instanceof Game)) continue;
-                    // if(game.id===8) console.log("TestingLinks",game.testLinkForCollision(team),team.name)
-                    if (game.testLinkForCollision(team)) {
-                        clashRegistry.addCommitment(team, timeSlot, role)
+                    // if(game.id===8) console.log("TestingLinks",game.testLinkForCollision(teamReference),teamReference.name)
+                    if (game.testLinkForCollision(teamReference)) {
+                        clashRegistry.addCommitment(teamReference, timeSlot, role)
                     }
                 }
             }
             return true;
+        }
+        clashRegistry.getTimeMap = function getTimeMap(teamReference){
+           if(teamReference?.source instanceof Team) teamReference = teamReference.source
+           if(!clashRegistry.has(teamReference)) clashRegistry.set(teamReference,new TimeMap())
+            return clashRegistry.get(teamReference);
         }
         this.__phaseRegistry = phaseRegistry;
 
@@ -126,17 +132,17 @@ var SupportScheduler = (function () {
                     let block = allBlocks[0];
                     if (options.supportSource.firstBlock.inBlock !== false) {
                         for (const inLink of block.incomingLinks) {
-                            potentialSupports.add({ source: inLink.source, sourceRank: inLink.sourceRank, startingScore: options.supportSource.firstBlock.inBlock });
+                            potentialSupports.add(new FakeLink({ source: inLink.source, sourceRank: inLink.sourceRank, startingScore: options.supportSource.firstBlock.inBlock }));
                         }
                     }
                     if (options.supportSource.firstBlock.externalAlts !== false) {
                         for (const inLink of block.incomingLinks) {
-                            potentialSupports.add({ source: inLink.source, sourceRank: (inLink.sourceRank === 1) ? 2 : 1, startingScore: options.supportSource.firstBlock.externalAlts });
+                            potentialSupports.add(new FakeLink({ source: inLink.source, sourceRank: (inLink.sourceRank === 1) ? 2 : 1, startingScore: options.supportSource.firstBlock.externalAlts }));
                         }
                     }
                     if (options.supportSource.firstBlock.backUp !== false) {
                         for (const team of phaseSupportTeams) {
-                            potentialSupports.add({ source: team, sourceRank: "Team", startingScore: options.supportSource.firstBlock.backUp });
+                            potentialSupports.add(new FakeLink({ source: team,  startingScore: options.supportSource.firstBlock.backUp }));
                         }
                     }
 
@@ -152,13 +158,13 @@ var SupportScheduler = (function () {
                     let potentialSupports = new UniqueSourceRankRegistry();
                     if (options.supportSource.subsequentBlocks.inBlock !== false) {
                         for (const inLink of allBlocks[i].incomingLinks) {
-                            potentialSupports.add({ source: inLink.source, sourceRank: inLink.sourceRank, startingScore: options.supportSource.subsequentBlocks.inBlock });
+                            potentialSupports.add(new FakeLink({ source: inLink.source, sourceRank: inLink.sourceRank, startingScore: options.supportSource.subsequentBlocks.inBlock }));
                         }
                     }
                     if (options.supportSource.subsequentBlocks.internalAlts !== false) {
                         for (const inLink of allBlocks[i].incomingLinks) {
                             if(inLink.source.phase!==phase) continue;
-                            let newFakeLink = { source: inLink.source, sourceRank: (inLink.sourceRank === 1) ? 2 : 1, startingScore: options.supportSource.subsequentBlocks.internalAlts }
+                            let newFakeLink = new FakeLink({ source: inLink.source, sourceRank: (inLink.sourceRank === 1) ? 2 : 1, startingScore: options.supportSource.subsequentBlocks.internalAlts })
                             if(block.hasIncomingLink(newFakeLink)) continue
                             potentialSupports.add(newFakeLink);
                         }
@@ -166,24 +172,24 @@ var SupportScheduler = (function () {
                     if (options.supportSource.subsequentBlocks.externalAlts !== false) {
                         for (const inLink of allBlocks[i].incomingLinks) {
                             if(inLink.source.phase===phase) continue;
-                            let newFakeLink = { source: inLink.source, sourceRank: (inLink.sourceRank === 1) ? 2 : 1, startingScore: options.supportSource.subsequentBlocks.externalAlts };
+                            let newFakeLink = new FakeLink({ source: inLink.source, sourceRank: (inLink.sourceRank === 1) ? 2 : 1, startingScore: options.supportSource.subsequentBlocks.externalAlts });
                             if(block.hasIncomingLink(newFakeLink)) continue
                             potentialSupports.add(newFakeLink);
                         }
                     }
                     if (options.supportSource.subsequentBlocks.previousRoundLosers !== false) {
                         for (const prevGame of allBlocks[i-1].allGamesArray) {
-                            potentialSupports.add({ source: prevGame, sourceRank:2, startingScore: options.supportSource.subsequentBlocks.previousRoundLosers });
+                            potentialSupports.add(new FakeLink({ source: prevGame, sourceRank:2, startingScore: options.supportSource.subsequentBlocks.previousRoundLosers }));
                         }
                     }
                     if (options.supportSource.subsequentBlocks.previousRoundWinners !== false) {
                         for (const prevGame of allBlocks[i-1].allGamesArray) {
-                            potentialSupports.add({ source: prevGame, sourceRank:1, startingScore: options.supportSource.subsequentBlocks.previousRoundWinners });
+                            potentialSupports.add(new FakeLink({ source: prevGame, sourceRank:1, startingScore: options.supportSource.subsequentBlocks.previousRoundWinners }));
                         }
                     }
                     if (options.supportSource.firstBlock.backUp !== false) {
                         for (const team of phaseSupportTeams) {
-                            potentialSupports.add({ source: team, sourceRank: "Team", startingScore: options.supportSource.firstBlock.backUp });
+                            potentialSupports.add(new FakeLink({ source: team, startingScore: options.supportSource.firstBlock.backUp }));
                         }
                     }
 
@@ -307,7 +313,7 @@ var SupportScheduler = (function () {
             let validSupportScores = []
             let {startTime,endTime} = timeSlot;
             for (const fakeLink of this) {
-                let gap = clashRegistry.get(fakeLink).findGap(startTime);
+                let gap = clashRegistry.getTimeMap(fakeLink).findGap(startTime);
                 if (gap.startTime === false) continue
                 if (gap.startTime <= startTime && gap.endTime >= endTime) {
                     validSupportScores.push({ team:fakeLink, gap, score: fakeLink.startingScore ?? 0 });
@@ -339,6 +345,19 @@ var SupportScheduler = (function () {
             fakeLinks.push({ source: link.source, sourceRank: link.sourceRank });
         }
         return fakeLinks
+    }
+
+    function FakeLink({source,sourceRank,startingScore}){
+        if (source instanceof Team){ 
+            sourceRank = 'Team';
+        } else {    
+            sourceRank ??= 1;// the rank of the game in the outcome of the source. Indexed at 1;
+            sourceRank = parseInt(sourceRank);
+        }
+
+        this.source=source;
+        this.sourceRank=sourceRank;
+        this.startingScore = startingScore ?? 0;
     }
 
     return SupportScheduler

@@ -42,10 +42,7 @@ var Block = (function () {
             return true; 
         }
         this.hasIncomingLink= function hasIncomingLink(link){
-            for(const inLink of this.incomingLinks){
-                if(inLink.source===link.source && inLink.sourceRank===link.sourceRank) return true
-            }
-            return false
+           return ancestralLinksRegistrar.testLink(link);
         }
         this.verifyLinks=function verifyLinks(){
             let testValidity = new ValidityTracker(true);

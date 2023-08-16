@@ -10,12 +10,12 @@ var SupportScheduler = (function () {
                 inBlock: false,
                 internalAlts: 10,
                 externalAlts: 0,
-                previousRoundWinners:false,
-                previousRoundLosers:10,
+                previousRoundWinners: false,
+                previousRoundLosers: 10,
                 backUp: -50
             }
         })
-        options.roles ?? (options.roles= [SupportScheduler.DUTY])
+        options.roles ?? (options.roles = [SupportScheduler.DUTY])
 
     }
     /**
@@ -34,6 +34,18 @@ var SupportScheduler = (function () {
         let clashRegistry = new Map();
         initiateDefaultOptions(options);
 
+        function normaliseTeamReference(teamReference) {
+            let normalisedTeamReference;
+            if (teamReference instanceof Team) {
+                normalisedTeamReference = new FakeLink({ source: teamReference })
+            } else if (teamReference instanceof FakeLink) {
+                normalisedTeamReference = teamReference
+            } else {
+                Break("Tried to normalise teamReference of unexpected formate",teamReference)
+            }
+            return normalisedTeamReference
+        }
+
         phaseRegistry.obtainAvailable = function obtainAvailable(timeSlot) {
             return this.get(timeSlot.scheduledItem.phase)?.obtainAvailable?.(timeSlot) ?? [];
         }
@@ -42,7 +54,7 @@ var SupportScheduler = (function () {
             // this.get(team).get(timeSlot.scheduledItem.phase).set(role, currentRoleCount + 1);
             // this.get(timeSlot.scheduledItem.phase).get(team).push({ timeSlot, role })
             let phase = timeSlot.scheduledItem.phase;
-            let serviceEntry = {team,timeSlot,role,phase};
+            let serviceEntry = { team, timeSlot, role, phase };
             this.get(team).get(phase).get(role).push(serviceEntry);
             this.get(phase).get(team).get(role).push(serviceEntry);
 
@@ -50,29 +62,41 @@ var SupportScheduler = (function () {
         }
         serviceRegistry.induction = function induction(team, phase) {
             let roleMap = new Map();
-            for(const role of options.roles){
-                roleMap.set(role,[])
+            for (const role of options.roles) {
+                roleMap.set(role, [])
             }
-            if (!this.has(team))            this.set(team, new Map())
+            if (!this.has(team)) this.set(team, new Map())
             if (!this.get(team).has(phase)) this.get(team).set(phase, roleMap);
 
-            if (!this.has(phase))           this.set(phase, new Map())
+            if (!this.has(phase)) this.set(phase, new Map())
             if (!this.get(phase).has(team)) this.get(phase).set(team, roleMap)
             return true;
         }
         clashRegistry.addCommitment = function addCommitment(teamReference, timeSlot, role) {
+            teamReference = normaliseTeamReference(teamReference);
             let clashMap = this.getTimeMap(teamReference);
-            clashMap.set({ game: timeSlot.scheduledItem, role }, { startTime: timeSlot.startTime, endTime: timeSlot.endTime })
+            clashMap.set({ game: timeSlot.scheduledItem, role }, { startTime: timeSlot.startTime, endTime: timeSlot.endTime });
+            let teamMode = (teamReference instanceof Team || teamReference?.source instanceof Team) ? true : false;
+            // for (const [key, timeMap] of clashRegistry) {
+            //     if (timeMap === clashMap) continue;
+            //     if (teamMode) {
+            //         if (key instanceof Team) continue
+            //         let game = key.source;
+
+            //     } else {
+
+            //     }
+            // }
             return true
         }
         clashRegistry.induction = function induction(teamReference) {
-            if(teamReference?.source instanceof Team) teamReference = teamReference.source
+            teamReference = normaliseTeamReference(teamReference);
             if (clashRegistry.has(teamReference)) return false;
             let role = e.PLAYER;
-            if(teamReference instanceof Team){
+            if (teamReference.source instanceof Team) {
                 for (const [game, timeSlot] of simplifiedFieldSchedule.index.entries()) {
                     if (!(game instanceof Game)) continue;
-                    if (game.ancestralSources.has(teamReference)) {
+                    if (game.ancestralSources.has(teamReference.source)) {
                         clashRegistry.addCommitment(teamReference, timeSlot, role)
                     }
                 }
@@ -87,11 +111,12 @@ var SupportScheduler = (function () {
             }
             return true;
         }
-        clashRegistry.getTimeMap = function getTimeMap(teamReference){
-           if(teamReference?.source instanceof Team) teamReference = teamReference.source
-           if(!clashRegistry.has(teamReference)) clashRegistry.set(teamReference,new TimeMap())
+        clashRegistry.getTimeMap = function getTimeMap(teamReference) {
+            teamReference = normaliseTeamReference(teamReference);
+            if (!clashRegistry.has(teamReference)) clashRegistry.set(teamReference, new TimeMap())
             return clashRegistry.get(teamReference);
         }
+       
         this.__phaseRegistry = phaseRegistry;
 
         for (const phase of comp.allPhasesArray) {
@@ -102,9 +127,10 @@ var SupportScheduler = (function () {
                 let phaseSupportTeams = phase.currentSettings.get(e.SUPPORT_TEAMS);
                 phaseRegistry.set(phase, phaseEntry);
                 for (const team of phaseSupportTeams) {
-                    phaseEntry.add(team);
-                    serviceRegistry.induction(team, phase)
-                    clashRegistry.induction(team)
+                    let teamReference = normaliseTeamReference(team)
+                    phaseEntry.add(teamReference);
+                    serviceRegistry.induction(teamReference, phase)
+                    clashRegistry.induction(teamReference)
                 }
                 phaseEntry.obtainAvailable = findValidPredeterminedSupport;
                 phaseEntry.supportOwed = Math.ceil(phase.allGamesInPhase.length / phaseSupportTeams.size)
@@ -115,15 +141,16 @@ var SupportScheduler = (function () {
 
                 let phaseEntry = new Map();
                 phaseRegistry.set(phase, phaseEntry);
-                phaseEntry.obtainAvailable=function(timeSlot){
+                phaseEntry.obtainAvailable = function (timeSlot) {
                     return phaseEntry.get(timeSlot.scheduledItem.block).obtainAvailable(timeSlot);
                 }
                 let phaseSupportTeams = phase.currentSettings.get(e.SUPPORT_TEAMS);
                 let allBlocks = phase.allBlocksArray;
                 //Set-up back-up teams
                 for (const team of phaseSupportTeams) {
-                    serviceRegistry.induction(team, phase);
-                    clashRegistry.induction(team);
+                    let teamReference = normaliseTeamReference(team);
+                    serviceRegistry.induction(teamReference, phase);
+                    clashRegistry.induction(teamReference);
                 }
 
                 //Create potential for first blocks
@@ -142,14 +169,14 @@ var SupportScheduler = (function () {
                     }
                     if (options.supportSource.firstBlock.backUp !== false) {
                         for (const team of phaseSupportTeams) {
-                            potentialSupports.add(new FakeLink({ source: team,  startingScore: options.supportSource.firstBlock.backUp }));
+                            potentialSupports.add(new FakeLink({ source: team, startingScore: options.supportSource.firstBlock.backUp }));
                         }
                     }
 
                     let blockEntry = potentialSupports.uniqueArray;
-                    blockEntry.supportOwed = Math.ceil(block.allGamesArray.length/blockEntry.size)
+                    blockEntry.supportOwed = Math.ceil(block.allGamesArray.length / blockEntry.size)
                     blockEntry.obtainAvailable = findValidTournamentSupport;
-                    phaseEntry.set(block,blockEntry);
+                    phaseEntry.set(block, blockEntry);
                 }
 
                 //Create potentials for subsequent blocks
@@ -163,28 +190,28 @@ var SupportScheduler = (function () {
                     }
                     if (options.supportSource.subsequentBlocks.internalAlts !== false) {
                         for (const inLink of allBlocks[i].incomingLinks) {
-                            if(inLink.source.phase!==phase) continue;
+                            if (inLink.source.phase !== phase) continue;
                             let newFakeLink = new FakeLink({ source: inLink.source, sourceRank: (inLink.sourceRank === 1) ? 2 : 1, startingScore: options.supportSource.subsequentBlocks.internalAlts })
-                            if(block.hasIncomingLink(newFakeLink)) continue
+                            if (block.hasIncomingLink(newFakeLink)) continue
                             potentialSupports.add(newFakeLink);
                         }
                     }
                     if (options.supportSource.subsequentBlocks.externalAlts !== false) {
                         for (const inLink of allBlocks[i].incomingLinks) {
-                            if(inLink.source.phase===phase) continue;
+                            if (inLink.source.phase === phase) continue;
                             let newFakeLink = new FakeLink({ source: inLink.source, sourceRank: (inLink.sourceRank === 1) ? 2 : 1, startingScore: options.supportSource.subsequentBlocks.externalAlts });
-                            if(block.hasIncomingLink(newFakeLink)) continue
+                            if (block.hasIncomingLink(newFakeLink)) continue
                             potentialSupports.add(newFakeLink);
                         }
                     }
                     if (options.supportSource.subsequentBlocks.previousRoundLosers !== false) {
-                        for (const prevGame of allBlocks[i-1].allGamesArray) {
-                            potentialSupports.add(new FakeLink({ source: prevGame, sourceRank:2, startingScore: options.supportSource.subsequentBlocks.previousRoundLosers }));
+                        for (const prevGame of allBlocks[i - 1].allGamesArray) {
+                            potentialSupports.add(new FakeLink({ source: prevGame, sourceRank: 2, startingScore: options.supportSource.subsequentBlocks.previousRoundLosers }));
                         }
                     }
                     if (options.supportSource.subsequentBlocks.previousRoundWinners !== false) {
-                        for (const prevGame of allBlocks[i-1].allGamesArray) {
-                            potentialSupports.add(new FakeLink({ source: prevGame, sourceRank:1, startingScore: options.supportSource.subsequentBlocks.previousRoundWinners }));
+                        for (const prevGame of allBlocks[i - 1].allGamesArray) {
+                            potentialSupports.add(new FakeLink({ source: prevGame, sourceRank: 1, startingScore: options.supportSource.subsequentBlocks.previousRoundWinners }));
                         }
                     }
                     if (options.supportSource.firstBlock.backUp !== false) {
@@ -194,24 +221,24 @@ var SupportScheduler = (function () {
                     }
 
                     let blockEntry = potentialSupports.uniqueArray;
-                    blockEntry.supportOwed = Math.ceil(block.allGamesArray.length/blockEntry.size);
+                    blockEntry.supportOwed = Math.ceil(block.allGamesArray.length / blockEntry.size);
                     blockEntry.obtainAvailable = findValidTournamentSupport;
-                    phaseEntry.set(allBlocks[i],blockEntry);
+                    phaseEntry.set(allBlocks[i], blockEntry);
                 }
                 //Induct all potentials
-                for(const [block,blockEntry] of phaseEntry){
+                for (const [block, blockEntry] of phaseEntry) {
                     // console.log("Block",block.id)
-                    for(const fakeLink of blockEntry){
-                        fakeLink.name = `${fakeLink.source.name} (${fakeLink.sourceRank})`
+                    for (const fakeLink of blockEntry) {
                         // console.log("Induction Link:",fakeLink.name)
-                        serviceRegistry.induction(fakeLink,phase);
-                        clashRegistry.induction(fakeLink);
+                        let teamReference = normaliseTeamReference(fakeLink)
+                        serviceRegistry.induction(teamReference, phase);
+                        clashRegistry.induction(teamReference);
                     }
                 }
             }
         }
 
-     
+
 
         this.getCompleteSchedule = function completeFieldSchedule() {
             for (const timeSlot of simplifiedFieldSchedule.index.values()) {
@@ -219,7 +246,7 @@ var SupportScheduler = (function () {
 
                 let availableTeamScores = phaseRegistry.obtainAvailable(timeSlot);
                 availableTeamScores = serialScoring(availableTeamScores, timeSlot, [scrPreviousService, scrPreferActive, scrEnsureBreak, scrOptional]);
-                console.log(timeSlot.scheduledItem.name,availableTeamScores.map(x => `${x.team.name}:${x.score}`))
+                console.log(timeSlot.scheduledItem.name, availableTeamScores.map(x => `${x.team.name}:${x.score}`))
 
                 availableTeamScores.length = Math.min(options.roles.length, availableTeamScores.length);
                 let gamePhase = timeSlot.scheduledItem.phase
@@ -298,9 +325,9 @@ var SupportScheduler = (function () {
         }
         function findValidPredeterminedSupport(timeSlot) {
             let validSupportScores = []
-            let {startTime,endTime} = timeSlot;
+            let { startTime, endTime } = timeSlot;
             for (const team of this) {
-                let gap = clashRegistry.get(team).findGap(startTime);
+                let gap = clashRegistry.getTimeMap(team).findGap(startTime);
                 if (gap.startTime === false) continue
                 if (gap.startTime <= startTime && gap.endTime >= endTime) {
                     validSupportScores.push({ team, gap, score: 0 });
@@ -309,14 +336,14 @@ var SupportScheduler = (function () {
             validSupportScores.supportOwed = this.supportOwed;
             return validSupportScores;
         }
-        function findValidTournamentSupport(timeSlot){
+        function findValidTournamentSupport(timeSlot) {
             let validSupportScores = []
-            let {startTime,endTime} = timeSlot;
+            let { startTime, endTime } = timeSlot;
             for (const fakeLink of this) {
                 let gap = clashRegistry.getTimeMap(fakeLink).findGap(startTime);
                 if (gap.startTime === false) continue
                 if (gap.startTime <= startTime && gap.endTime >= endTime) {
-                    validSupportScores.push({ team:fakeLink, gap, score: fakeLink.startingScore ?? 0 });
+                    validSupportScores.push({ team: fakeLink, gap, score: fakeLink.startingScore ?? 0 });
                 }
             }
             validSupportScores.supportOwed = this.supportOwed;
@@ -347,17 +374,18 @@ var SupportScheduler = (function () {
         return fakeLinks
     }
 
-    function FakeLink({source,sourceRank,startingScore}){
-        if (source instanceof Team){ 
+    function FakeLink({ source, sourceRank, startingScore }) {
+        if (source instanceof Team) {
             sourceRank = 'Team';
-        } else {    
+        } else {
             sourceRank ??= 1;// the rank of the game in the outcome of the source. Indexed at 1;
             sourceRank = parseInt(sourceRank);
         }
 
-        this.source=source;
-        this.sourceRank=sourceRank;
+        this.source = source;
+        this.sourceRank = sourceRank;
         this.startingScore = startingScore ?? 0;
+        this.name = `${this.source.name} (${this.sourceRank})`
     }
 
     return SupportScheduler

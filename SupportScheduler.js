@@ -353,27 +353,6 @@ var SupportScheduler = (function () {
     }
 
 
-
-
-    function makeFakeOutLinks(game, { includeWinner = true, includeLoser = true }) {
-        let fakeLinks = [];
-        for (const link of game.outgoingLinks) {
-            if ((includeWinner === true && link.sourceRank == 1) || (includeLoser === true && link.sourceRank == 2)) {
-                fakeLinks.push({ source: link.source, sourceRank: link.sourceRank });
-            }
-        }
-        return fakeLinks
-    }
-
-
-    function makeFakeInLinks(game) {
-        let fakeLinks = [];
-        for (const link of game.incomingLinks) {
-            fakeLinks.push({ source: link.source, sourceRank: link.sourceRank });
-        }
-        return fakeLinks
-    }
-
     function FakeLink({ source, sourceRank, startingScore }) {
         if (source instanceof Team) {
             sourceRank = 'Team';

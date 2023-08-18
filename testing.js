@@ -9,14 +9,32 @@ let oLog ={};
 let teams = {
   
 }
-newTeam("A")
-newTeam("B")
-newTeam("C")
+let ta = newTeam("A")
+let tb =newTeam("B")
+let tc = newTeam("C")
 newTeam("D")
 newTeam("E")
 newTeam("F")
 newTeam("G")
 newTeam("H")
+
+// let diva = new Division("A");
+// let divb= new Division("B");
+// let divC = new Division("C");
+// console.log(
+// diva.add(ta),
+// divb.add(tb),
+// diva.add(divb),
+// "Recursive add",
+// divb.add(diva),
+// divC.add(divb),
+// diva.add(divC),
+// divC.add(tc),
+// diva.teams,
+// diva.subDivisions,
+// diva.allTeams,
+// diva.allSubDivisions);
+
 let phases = {
 }
 

@@ -359,6 +359,7 @@
                     simplifiedFieldSchedule.index.set(timeSlot.scheduledItem,timeSlot)
                 }
             }
+            simplifiedFieldSchedule.phaseEndTimes = new Map(this._allPhases);
             return simplifiedFieldSchedule
         },
 

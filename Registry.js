@@ -122,6 +122,7 @@ var UniqueSourceRankRegistry = (function(){
             if (newEntry["sourceRankGroup"].length===1){
                this._uniqueSourceRankRegistry.add(link);    
             }
+            return newEntry["sourceRankGroup"][0];
         },
         wipe(){
             this._registry.clear();

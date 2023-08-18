@@ -41,6 +41,7 @@ var Phase = (function () {
         defineGetter({ obj: this, name: "outgoingLinks", func: () => Array.from(links.keys()).filter((cv) => cv.source === this) });
         defineGetter({ obj: this, name: "allIncomingLinks", func: () => this.allBlocksArray.reduce((acc,block)=>{acc.push(...block.incomingLinks);return acc;},[])});
         defineGetter({ obj: this, name: "ancestralLinks", func: () => ancestralLinksRegistrar.registryManager.uniqueArray});
+        defineGetter({ obj: this, name: "maxPossibleTeams", func: () => Array.from(this.ancestralLinks).filter(x=>x.source instanceof Team).length });
         defineGetter({ obj: this, name: "validity", func: () => validity.copy()});
         defineGetter({ obj: this, name: "phaseType", func: () => phaseType});
         defineGetter({ obj: this, name: "flesh", func: () => associatedDivFlesh });
@@ -64,14 +65,15 @@ var Phase = (function () {
                 if(ancestralLinksRegistrar.add(link) && propagation){
                     this.outgoingLinks.forEach(iLink =>iLink.target.addAncestralLink(iLink)) //makes it re-add all the ancestral links of this phase, which is the unique list. 
                     };
-            
-            
         }
         this.removeLink = function (link) {
             if (!(link instanceof Link)) Break("Only Links can be so removed. ",{link});
             if (!link.forDeletion)  return link.deleteLink();
             Verification.queue(this);
             links.delete(link);
+        }
+        this.testLinkForCollision= function testLinkForCollision(link){
+            return ancestralLinksRegistrar.testLink(link);
         }
         this.remakeAncestralRegister = function remakeAncestralRegister(originatingLink){
             if(phaseType===e.TOURNAMENT) return true;
@@ -98,7 +100,7 @@ var Phase = (function () {
                     objections.forEach(objection=>{objection.lodge();testValidity.fail(objection.reason)})
                 }
 
-            let maxPossibleTeams=Array.from(this.ancestralLinks).filter(x=>x.source instanceof Team).length; 
+            let maxPossibleTeams=this.maxPossibleTeams;
                 this.outgoingLinks.forEach((outLink) => {
                 if(outLink.sourceRank > maxPossibleTeams) {
                     new Objection(outLink.target,[outLink],Objection.NotEnoughTeams,this)

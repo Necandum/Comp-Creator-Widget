@@ -22,6 +22,7 @@ var e = {
         SUPPORT_TEAMS:"supportTeams",
         SUPPORT_SELECTION:"supportSelection",
         PLAYER:"player",
+        POTENTIAL_CLASH:"potentialClash",
 }
 
 

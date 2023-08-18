@@ -3,15 +3,16 @@ var SupportScheduler = (function () {
         options.supportSource ?? (options.supportSource = {
             firstBlock: {
                 inBlock: 0,
-                externalAlts: false,
+                externalAlts: undefined,
                 backUp: -50
             },
             subsequentBlocks: {
-                inBlock: false,
+                inBlock: undefined,
                 internalAlts: 10,
                 externalAlts: 0,
-                previousRoundWinners: false,
+                previousRoundWinners: undefined,
                 previousRoundLosers: 10,
+                previousRoundParticipants: undefined,
                 backUp: -50
             }
         })
@@ -49,66 +50,75 @@ var SupportScheduler = (function () {
         phaseRegistry.obtainAvailable = function obtainAvailable(timeSlot) {
             return this.get(timeSlot.scheduledItem.phase)?.obtainAvailable?.(timeSlot) ?? [];
         }
-        serviceRegistry.setSupport = function setSupport(team, timeSlot, role) {
-            // let currentRoleCount = this.get(team).get(timeSlot.scheduledItem.phase).get(role) ?? 0;
-            // this.get(team).get(timeSlot.scheduledItem.phase).set(role, currentRoleCount + 1);
-            // this.get(timeSlot.scheduledItem.phase).get(team).push({ timeSlot, role })
+        serviceRegistry.setSupport = function setSupport(teamReference, timeSlot, role) {
+            if(!(teamReference instanceof FakeLink)) Break("Team reference must be a FakeLink",teamReference);
             let phase = timeSlot.scheduledItem.phase;
-            let serviceEntry = { team, timeSlot, role, phase };
-            this.get(team).get(phase).get(role).push(serviceEntry);
-            this.get(phase).get(team).get(role).push(serviceEntry);
+            let serviceEntry = { teamReference, timeSlot, role, phase };
+            this.get(teamReference).get(phase).get(role).push(serviceEntry);
+            this.get(phase).get(teamReference).get(role).push(serviceEntry);
 
-            clashRegistry.addCommitment(team, timeSlot, e.SUPPORT_TEAMS);
+            clashRegistry.addCommitment(teamReference, timeSlot, e.SUPPORT_TEAMS);
         }
-        serviceRegistry.induction = function induction(team, phase) {
+        serviceRegistry.induction = function induction(teamReference, phase) {
+            if(!(teamReference instanceof FakeLink)) Break("Team reference must be a FakeLink",teamReference);
             let roleMap = new Map();
             for (const role of options.roles) {
                 roleMap.set(role, [])
             }
-            if (!this.has(team)) this.set(team, new Map())
-            if (!this.get(team).has(phase)) this.get(team).set(phase, roleMap);
+            if (!this.has(teamReference)) this.set(teamReference, new Map())
+            if (!this.get(teamReference).has(phase)) this.get(teamReference).set(phase, roleMap);
 
             if (!this.has(phase)) this.set(phase, new Map())
-            if (!this.get(phase).has(team)) this.get(phase).set(team, roleMap)
+            if (!this.get(phase).has(teamReference)) this.get(phase).set(teamReference, roleMap)
             return true;
         }
         clashRegistry.addCommitment = function addCommitment(teamReference, timeSlot, role) {
-            teamReference = normaliseTeamReference(teamReference);
-            let clashMap = this.getTimeMap(teamReference);
-            clashMap.set({ game: timeSlot.scheduledItem, role }, { startTime: timeSlot.startTime, endTime: timeSlot.endTime });
-            let teamMode = (teamReference instanceof Team || teamReference?.source instanceof Team) ? true : false;
-            // for (const [key, timeMap] of clashRegistry) {
-            //     if (timeMap === clashMap) continue;
-            //     if (teamMode) {
-            //         if (key instanceof Team) continue
-            //         let game = key.source;
-
-            //     } else {
-
-            //     }
-            // }
+            this.recordClash(teamReference,timeSlot,role);
+            for (const [key, timeMap] of clashRegistry) {
+                if (key === teamReference) continue;
+                if (key.source instanceof Team) continue;
+                if(!(key.source instanceof Game)&&!(key.source instanceof Phase)) Break("teamReference must be a Fakelink, and the source should be a Team or a Game or Phase.",{teamReference,timeSlot,role})
+                if(key.source.testLinkForCollision(teamReference)) this.recordClash(teamReference,timeSlot,e.POTENTIAL_CLASH)
+            }
             return true
         }
+        clashRegistry.recordClash = function recordClash(teamReference, timeSlot, role){
+            if(!(teamReference instanceof FakeLink)) Break("Team reference must be a FakeLink",teamReference);
+            let clashMap = this.getTimeMap(teamReference);
+            clashMap.set({ game: timeSlot.scheduledItem, role }, { startTime: timeSlot.startTime, endTime: timeSlot.endTime });
+        }
+
         clashRegistry.induction = function induction(teamReference) {
-            teamReference = normaliseTeamReference(teamReference);
+            if(!(teamReference instanceof FakeLink)) Break("Team reference must be a FakeLink",teamReference);
             if (clashRegistry.has(teamReference)) return false;
-            let role = e.PLAYER;
-            if (teamReference.source instanceof Team) {
-                for (const [game, timeSlot] of simplifiedFieldSchedule.index.entries()) {
-                    if (!(game instanceof Game)) continue;
-                    if (game.ancestralSources.has(teamReference.source)) {
-                        clashRegistry.addCommitment(teamReference, timeSlot, role)
+
+            //Establish a clash to ensure a teamReference to a game/phase is not eligible for service before the game/phase they come from is finished
+            if(teamReference.source instanceof Game){
+                for(const inLink of teamReference.source.incomingLinks){
+                    if(inLink.source instanceof Team){
+                        continue;
+                    } else if(inLink.source instanceof Game){
+                        let fakeTimeSlot = {scheduledItem:"Parent Game unfinished",startTime:0,endTime:simplifiedFieldSchedule.index.get(inLink.source).endTime};
+                        this.recordClash(teamReference,fakeTimeSlot,"Parent Game unfinished");
+                    } else if(inLink.source instanceof Phase){
+                        let fakeTimeSlot = {scheduledItem:"Parent Phase unfinished",startTime:0,endTime:simplifiedFieldSchedule.phaseEndTimes.get(inLink.source)};
+                        this.recordClash(teamReference,fakeTimeSlot,"Parent Phase unfinished");
+                    } else {
+                        Break("Error, incoming link source is not a Team/Game/Phase",{teamReference,inLink})
                     }
                 }
-            } else {
-                for (const [game, timeSlot] of simplifiedFieldSchedule.index.entries()) {
-                    if (!(game instanceof Game)) continue;
-                    // if(game.id===8) console.log("TestingLinks",game.testLinkForCollision(teamReference),teamReference.name)
-                    if (game.testLinkForCollision(teamReference)) {
-                        clashRegistry.addCommitment(teamReference, timeSlot, role)
-                    }
-                }
+            } else if(teamReference.source instanceof Phase){
+                let fakeTimeSlot = {scheduledItem:"Phase unfinished",startTime:0,endTime:simplifiedFieldSchedule.phaseEndTimes.get(teamReference.source)};
+                this.recordClash(teamReference,fakeTimeSlot,"Phase unfinished");
             }
+
+            //Establish a clash for any existing clashRegistry entries that have the new addition as a possible clash
+                for (const [game, timeSlot] of simplifiedFieldSchedule.index.entries()) {
+                    if (!(game instanceof Game)) continue;
+                    if (game.testLinkForCollision(teamReference)) {
+                        clashRegistry.recordClash(teamReference, timeSlot, e.PLAYER);
+                    }
+                }
             return true;
         }
         clashRegistry.getTimeMap = function getTimeMap(teamReference) {
@@ -117,8 +127,9 @@ var SupportScheduler = (function () {
             return clashRegistry.get(teamReference);
         }
        
-        this.__phaseRegistry = phaseRegistry;
+        this.__phaseRegistry = phaseRegistry; // for debugging only
 
+        //Identify teams suitable for support service for each phase(/block)
         for (const phase of comp.allPhasesArray) {
             //Predetermined Support Players
             if (phase.currentSettings.get(e.SUPPORT_SELECTION) === e.PREDETERMINED) {
@@ -157,17 +168,17 @@ var SupportScheduler = (function () {
                 firstBlock: {
                     let potentialSupports = new UniqueSourceRankRegistry();
                     let block = allBlocks[0];
-                    if (options.supportSource.firstBlock.inBlock !== false) {
+                    if (options.supportSource.firstBlock.inBlock !== undefined) {
                         for (const inLink of block.incomingLinks) {
                             potentialSupports.add(new FakeLink({ source: inLink.source, sourceRank: inLink.sourceRank, startingScore: options.supportSource.firstBlock.inBlock }));
                         }
                     }
-                    if (options.supportSource.firstBlock.externalAlts !== false) {
+                    if (options.supportSource.firstBlock.externalAlts !== undefined) {
                         for (const inLink of block.incomingLinks) {
                             potentialSupports.add(new FakeLink({ source: inLink.source, sourceRank: (inLink.sourceRank === 1) ? 2 : 1, startingScore: options.supportSource.firstBlock.externalAlts }));
                         }
                     }
-                    if (options.supportSource.firstBlock.backUp !== false) {
+                    if (options.supportSource.firstBlock.backUp !== undefined) {
                         for (const team of phaseSupportTeams) {
                             potentialSupports.add(new FakeLink({ source: team, startingScore: options.supportSource.firstBlock.backUp }));
                         }
@@ -180,15 +191,15 @@ var SupportScheduler = (function () {
                 }
 
                 //Create potentials for subsequent blocks
-                for (let i = 1; i < allBlocks.length; i++) {
+                subsequentBlocks: for (let i = 1; i < allBlocks.length; i++) {
                     const block = allBlocks[i];
                     let potentialSupports = new UniqueSourceRankRegistry();
-                    if (options.supportSource.subsequentBlocks.inBlock !== false) {
+                    if (options.supportSource.subsequentBlocks.inBlock !== undefined) {
                         for (const inLink of allBlocks[i].incomingLinks) {
                             potentialSupports.add(new FakeLink({ source: inLink.source, sourceRank: inLink.sourceRank, startingScore: options.supportSource.subsequentBlocks.inBlock }));
                         }
                     }
-                    if (options.supportSource.subsequentBlocks.internalAlts !== false) {
+                    if (options.supportSource.subsequentBlocks.internalAlts !== undefined) {
                         for (const inLink of allBlocks[i].incomingLinks) {
                             if (inLink.source.phase !== phase) continue;
                             let newFakeLink = new FakeLink({ source: inLink.source, sourceRank: (inLink.sourceRank === 1) ? 2 : 1, startingScore: options.supportSource.subsequentBlocks.internalAlts })
@@ -196,7 +207,7 @@ var SupportScheduler = (function () {
                             potentialSupports.add(newFakeLink);
                         }
                     }
-                    if (options.supportSource.subsequentBlocks.externalAlts !== false) {
+                    if (options.supportSource.subsequentBlocks.externalAlts !== undefined) {
                         for (const inLink of allBlocks[i].incomingLinks) {
                             if (inLink.source.phase === phase) continue;
                             let newFakeLink = new FakeLink({ source: inLink.source, sourceRank: (inLink.sourceRank === 1) ? 2 : 1, startingScore: options.supportSource.subsequentBlocks.externalAlts });
@@ -204,17 +215,23 @@ var SupportScheduler = (function () {
                             potentialSupports.add(newFakeLink);
                         }
                     }
-                    if (options.supportSource.subsequentBlocks.previousRoundLosers !== false) {
+                    if (options.supportSource.subsequentBlocks.previousRoundLosers !== undefined) {
                         for (const prevGame of allBlocks[i - 1].allGamesArray) {
                             potentialSupports.add(new FakeLink({ source: prevGame, sourceRank: 2, startingScore: options.supportSource.subsequentBlocks.previousRoundLosers }));
                         }
                     }
-                    if (options.supportSource.subsequentBlocks.previousRoundWinners !== false) {
+                    if (options.supportSource.subsequentBlocks.previousRoundWinners !== undefined) {
                         for (const prevGame of allBlocks[i - 1].allGamesArray) {
                             potentialSupports.add(new FakeLink({ source: prevGame, sourceRank: 1, startingScore: options.supportSource.subsequentBlocks.previousRoundWinners }));
                         }
                     }
-                    if (options.supportSource.firstBlock.backUp !== false) {
+                    if (options.supportSource.subsequentBlocks.previousRoundParticipants !== undefined) {
+                        for (const prevGame of allBlocks[i - 1].allGamesArray) {
+                            potentialSupports.add(new FakeLink({ source: prevGame, sourceRank: 1, startingScore: options.supportSource.subsequentBlocks.previousRoundParticipants }));
+                            potentialSupports.add(new FakeLink({ source: prevGame, sourceRank: 2, startingScore: options.supportSource.subsequentBlocks.previousRoundParticipants}));
+                        }
+                    }
+                    if (options.supportSource.firstBlock.backUp !== undefined) {
                         for (const team of phaseSupportTeams) {
                             potentialSupports.add(new FakeLink({ source: team, startingScore: options.supportSource.firstBlock.backUp }));
                         }
@@ -228,9 +245,9 @@ var SupportScheduler = (function () {
                 //Induct all potentials
                 for (const [block, blockEntry] of phaseEntry) {
                     // console.log("Block",block.id)
-                    for (const fakeLink of blockEntry) {
+                    for (const teamReference of blockEntry) {
                         // console.log("Induction Link:",fakeLink.name)
-                        let teamReference = normaliseTeamReference(fakeLink)
+                        if(!(teamReference instanceof FakeLink)) Break("Team references must be a fakelink", {teamReference,blockEntry,block,phaseEntry})
                         serviceRegistry.induction(teamReference, phase);
                         clashRegistry.induction(teamReference);
                     }
@@ -305,7 +322,7 @@ var SupportScheduler = (function () {
                 if (availableTeamScore.gap.endTime !== false) {
                     let timeTilActive = availableTeamScore.gap.endTime - timeSlot.endTime;
                     let nextRole = availableTeamScore.gap.nextEntries[0]?.item.role;
-                    if (timeTilActive <= timeSlot.length) {
+                    if (timeTilActive <= timeSlot.length*0.9) {
                         availableTeamScore.score += (nextRole === e.PLAYER) ? -2000 : 10;
                     }
                 }
@@ -339,11 +356,11 @@ var SupportScheduler = (function () {
         function findValidTournamentSupport(timeSlot) {
             let validSupportScores = []
             let { startTime, endTime } = timeSlot;
-            for (const fakeLink of this) {
-                let gap = clashRegistry.getTimeMap(fakeLink).findGap(startTime);
+            for (const teamReference of this) {
+                let gap = clashRegistry.getTimeMap(teamReference).findGap(startTime);
                 if (gap.startTime === false) continue
                 if (gap.startTime <= startTime && gap.endTime >= endTime) {
-                    validSupportScores.push({ team: fakeLink, gap, score: fakeLink.startingScore ?? 0 });
+                    validSupportScores.push({ team: teamReference, gap, score: teamReference.startingScore});
                 }
             }
             validSupportScores.supportOwed = this.supportOwed;
@@ -352,8 +369,10 @@ var SupportScheduler = (function () {
 
     }
 
+var FakeLink = (function(){ 
+let uniqueRegistry = new UniqueSourceRankRegistry(FakeLink);
 
-    function FakeLink({ source, sourceRank, startingScore }) {
+    function FakeLink({ source, sourceRank, startingScore }){
         if (source instanceof Team) {
             sourceRank = 'Team';
         } else {
@@ -365,7 +384,12 @@ var SupportScheduler = (function () {
         this.sourceRank = sourceRank;
         this.startingScore = startingScore ?? 0;
         this.name = `${this.source.name} (${this.sourceRank})`
+
+        return uniqueRegistry.add(this)
     }
+
+return FakeLink
+})()
 
     return SupportScheduler
 })()

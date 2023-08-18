@@ -41,7 +41,9 @@ var Block = (function () {
             this.incomingLinks.forEach(iLink=>this.addAncestralLink(iLink));
             return true; 
         }
-
+        this.hasIncomingLink= function hasIncomingLink(link){
+           return ancestralLinksRegistrar.testLink(link);
+        }
         this.verifyLinks=function verifyLinks(){
             let testValidity = new ValidityTracker(true);
             Verification.revokeAllObjections(this);

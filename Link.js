@@ -12,8 +12,13 @@ var Link = (function () {
         defineGetter({ obj: this, name: "forDeletion", func: () => forDeletion })
         defineGetter({ obj: this, name: "valid", func: () => validity.status })
 
-        if (source instanceof Team) sourceRank = 'Team';
-        sourceRank ??= 1;// the rank of the game in the outcome of the source. Indexed at 1;
+        if (source instanceof Team){ 
+            sourceRank = 'Team';
+        } else {    
+            sourceRank ??= 1;// the rank of the game in the outcome of the source. Indexed at 1;
+            sourceRank = parseInt(sourceRank);
+        }
+        
 
         this.deleteLink = function () {
             forDeletion=true;

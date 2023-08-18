@@ -10,6 +10,8 @@ var Phase = (function () {
                 { label: "Game", playTime: true, playerAvailable: false, endAtMiliSecond: 20*60*1000 },
                 { label: "Change-Over", playTime: false, playerAvailable: true, endAtMiliSecond: 30*60*1000 }
             ]],
+            [e.SUPPORT_TEAMS,new Set()],
+            [e.SUPPORT_SELECTION,e.PREDETERMINED] //e.PREDETERMINED or e.TOURNAMENT
         ])
         let blocks = [];
         let divisions = [];
@@ -27,9 +29,10 @@ var Phase = (function () {
         defineGetter({ obj: this, name: "parent", func: () => parent });
         defineGetter({
             obj: this, name: "currentSettings", func: () => {
-                let newMap = new Map(Array.from(settings))
+                let newMap = new Map(settings)
                 let newGameStages = deepCopyArrayOfObjects(newMap.get(e.GAME_STAGES));
                 newMap.set(e.GAME_STAGES, newGameStages)
+                newMap.set(e.SUPPORT_TEAMS,new Set(newMap.get(e.SUPPORT_TEAMS)))
                 return newMap;
             }
         });
@@ -38,6 +41,7 @@ var Phase = (function () {
         defineGetter({ obj: this, name: "outgoingLinks", func: () => Array.from(links.keys()).filter((cv) => cv.source === this) });
         defineGetter({ obj: this, name: "allIncomingLinks", func: () => this.allBlocksArray.reduce((acc,block)=>{acc.push(...block.incomingLinks);return acc;},[])});
         defineGetter({ obj: this, name: "ancestralLinks", func: () => ancestralLinksRegistrar.registryManager.uniqueArray});
+        defineGetter({ obj: this, name: "maxPossibleTeams", func: () => Array.from(this.ancestralLinks).filter(x=>x.source instanceof Team).length });
         defineGetter({ obj: this, name: "validity", func: () => validity.copy()});
         defineGetter({ obj: this, name: "phaseType", func: () => phaseType});
         defineGetter({ obj: this, name: "flesh", func: () => associatedDivFlesh });
@@ -61,14 +65,15 @@ var Phase = (function () {
                 if(ancestralLinksRegistrar.add(link) && propagation){
                     this.outgoingLinks.forEach(iLink =>iLink.target.addAncestralLink(iLink)) //makes it re-add all the ancestral links of this phase, which is the unique list. 
                     };
-            
-            
         }
         this.removeLink = function (link) {
             if (!(link instanceof Link)) Break("Only Links can be so removed. ",{link});
             if (!link.forDeletion)  return link.deleteLink();
             Verification.queue(this);
             links.delete(link);
+        }
+        this.testLinkForCollision= function testLinkForCollision(link){
+            return ancestralLinksRegistrar.testLink(link);
         }
         this.remakeAncestralRegister = function remakeAncestralRegister(originatingLink){
             if(phaseType===e.TOURNAMENT) return true;
@@ -95,7 +100,7 @@ var Phase = (function () {
                     objections.forEach(objection=>{objection.lodge();testValidity.fail(objection.reason)})
                 }
 
-            let maxPossibleTeams=Array.from(this.ancestralLinks).filter(x=>x.source instanceof Team).length; 
+            let maxPossibleTeams=this.maxPossibleTeams;
                 this.outgoingLinks.forEach((outLink) => {
                 if(outLink.sourceRank > maxPossibleTeams) {
                     new Objection(outLink.target,[outLink],Objection.NotEnoughTeams,this)
@@ -144,6 +149,13 @@ var Phase = (function () {
                 case e.PHASE_TYPE:
                     if (newValue !== e.ROUND_ROBIN && newValue !== e.TOURNAMENT) throw new Error("Must be a round robin or tournament")
                     settings.set(setting, newValue);
+                    break;
+                case e.SUPPORT_TEAMS:
+                    settings.set(e.SUPPORT_TEAMS,newValue);
+                    break;
+                case e.SUPPORT_SELECTION:
+                    if(newValue!==e.PREDETERMINED && newValue!==e.TOURNAMENT) Break("Must either be e.PREDETERMINED or e.TOURNAMENT",{newValue})
+                    settings.set(e.SUPPORT_SELECTION,newValue);
                     break;
                 default:
                     throw new Error("Not an existing setting");

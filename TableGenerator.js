@@ -1,8 +1,5 @@
-var comp = new Competition("Shark Attack");
-CodeObserver.register(Game);
-CodeObserver.register(Phase);
-CodeObserver.register(Team);
 
+//Depreciated
 var TableGenerator = (function TableGeneratorBuilder(comp) {
     let HtmlTemplates = {};
     let EventTemplates = {};

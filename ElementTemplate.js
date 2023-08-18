@@ -3,6 +3,7 @@ var ElementTemplate = (function () {
     function ElementTemplate({ htmlInsert, addEvents = [], addDataset = [], addClasses = [], addTemplates = [], label, addAsElder, onCreationCode }) {
 
         this.__peek = arguments[0];
+        
         this.build = function (root,{creationCodeArg}={}) {
             let mainDiv = document.createElement('div');
             let data = new Map([[mainDiv, new Map()]]);
@@ -25,6 +26,7 @@ var ElementTemplate = (function () {
                 }
             });
             defineGetter({ obj: mainDiv, name: "leaf", func: () => ({ data: mainDiv.data, treeData }) });
+
             Object.defineProperty(mainDiv, "template", { value: this,configurable: false, enumerable: true, writable: false });
 
             mainDiv.save = function save({ element, dataArr = [{ key: "", value: false }], override = true }) {

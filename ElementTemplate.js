@@ -6,43 +6,40 @@ var ElementTemplate = (function () {
         
         this.build = function (root,{creationCodeArg}={}) {
             let mainDiv = document.createElement('div');
-            let data = new Map([[mainDiv, new Map()]]);
-            let treeData = new Map();
-            let initialHtml;
             let elder = (root) ? root.elder : {};
+            let data = (root) ? root.getActualDataObject():new Map();
             let uniqueKey = Symbol("Unique Key");
             if (addAsElder && elder[addAsElder]) Break("Cannot add two elders of same name", { args: arguments[0], addAsElder })
             if (addAsElder) elder[addAsElder] = mainDiv;
             mainDiv.__label = label; //for debugging
             defineGetter({ obj: mainDiv, name: "root", func: () => root });
             defineGetter({ obj: mainDiv, name: "elder", func: () => ({ ...elder }) });
-            defineGetter({ obj: mainDiv, name: "spirit", func: () => mainDiv.quickLoad(uniqueKey) });
-            defineSetter({ obj: mainDiv, name: "spirit", func: (unit) => mainDiv.quickSave(uniqueKey,unit)});
-            defineGetter({
-                obj: mainDiv, name: "data", func: () => {
+            defineGetter({ obj: mainDiv, name: "_data", func: () => data});
+            defineGetter({obj: mainDiv, name: "data", func: () => {
                     let newData = new Map();
-                    data.forEach((elemData, elem) => { newData.set(elem, new Map(elemData.entries())) })
+                    data.forEach((elemData, elem) => { newData.set(elem, new Map(elemData)) })
                     return newData;
                 }
             });
-            defineGetter({ obj: mainDiv, name: "leaf", func: () => ({ data: mainDiv.data, treeData }) });
+            defineGetter({ obj: mainDiv, name: "treeData", func: () => treeData});
 
             Object.defineProperty(mainDiv, "template", { value: this,configurable: false, enumerable: true, writable: false });
-
-            mainDiv.save = function save({ element, dataArr = [{ key: "", value: false }], override = true }) {
+            mainDiv.getActualDataObject = function getActualDataObject(){
+                return data;
+            }
+            mainDiv.save = function save({ element, dataArr = [["key","value"]], override = true }) {
                 if (!element instanceof HTMLElement) Break("element must be a HTML element", { args: arguments[0] });
 
-                if (!data.has(element)) data.set(element, new Map())
-                let elementDataStore = data.get(element);
+                let elementDataStore =  data.get(element) ?? data.set(element,new Map()).get(element);
 
                 for (const datum of dataArr) {
-                    if (!override && elementDataStore.has(datum.key)) continue
-                    elementDataStore.set(datum.key, datum.value);
+                    if (!override && elementDataStore.has(datum[0])) continue
+                    elementDataStore.set(datum[0], datum[1]);
                 }
-                if (root) root.acceptPropogation(this, this.leaf);
+                return true
             }
             mainDiv.quickSave = function quickSave (key, value) {
-                this.save({ element: this, dataArr: [{ key, value }], override: true });
+               return mainDiv.save({ element: this, dataArr: [[key, value]], override: true });
             }
             mainDiv.quickLoad = function quickLoad(key) {
                 if (!data?.get?.(this)) Break("Cannot quick load when data element doesn't exist")
@@ -51,12 +48,7 @@ var ElementTemplate = (function () {
             mainDiv.deleteElementDataStore= function deleteElementDataStore(key){
                 data.get(key)?.clear();
             }
-            mainDiv.acceptPropogation = function acceptPropogation(node, leaf) {
-                treeData.set(node, leaf);
-                if (root) root.acceptPropogation(this, this.leaf);
-            }
-
-
+            
             if (htmlInsert) {
                 if (!Array.isArray(htmlInsert)) htmlInsert = [htmlInsert];
                 for (const htmlInsertItem of htmlInsert) {
@@ -121,6 +113,9 @@ var ElementTemplate = (function () {
         if (!root || !elder || !node) Break("All three arguments required", { root, elder, node });
         defineGetter({ obj: node, name: "root", func: () => root });
         defineGetter({ obj: node, name: "elder", func: () => ({ ...elder }) });
+
+        node.quickSave =(key,value)=> root.quickSave.call(node,key,value);
+        node.quickLoad = (key)=> root.quickLoad.call(node,key);
         let childNodes = Array.from(node.childNodes);
         for (const childNode of childNodes) {
             addRootToChildNodes(root, elder, childNode);

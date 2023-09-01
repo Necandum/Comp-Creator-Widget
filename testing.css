@@ -1,87 +1,10 @@
-* {
-    box-sizing: border-box;
-}
-
-div.teamInput input {
-    width:130px;
-}
-
-div.playerInput input {
-    width:60px;
-    color:blue;
-}
-
-div.table {
-    max-width: 100%;
-    display:flex;
-    flex-flow: row wrap;
-}
-div.table.noFlex{
-    display:inline-block;
-}
-div.row {
-    display:block;
-}
-div.phaseContainer {
-    display:flex;
-    background-color: yellow;
-    
-}
-
-div.blockContainer {
-    display:flex;
-    background-color: aqua;
-    flex-direction: column;
-}
-
-div.gameContainer{
-    display:inline-block;
-    background-color:lightgreen;
-}
-
-div.divideTeamSelection{
-    font-size: 0.8em;
-    padding:0px;
-    margin:0px;
-    text-align: center;
-}
-div.divideTeamSelection *{
-    margin:0px;
-    padding:0px;
-}
-div.table div{
-    padding:5px;
+div.inputContainer{
     margin:10px;
-    align-items:center;
+}
+.toggleSelection{
+    background-color: yellow;
 }
 
-div.columnContainer{
-    display:flex;
-    flex-direction:row;
-}
-div.column{
-    display: flex;
-    flex-direction:column;
-}
-div.blockContainer div{
-    padding:2px;
-    margin:2px;
-    align-items:center;
-}
-
-.orderLast {
-        order:99;
-}
-
-input.numericalInput{
-    width:2.5em;
-   
-}
-
-select.sourceSelect{
-    width:8em;
-}
-
-div.invalid{
-    background-color: pink;
+div.failed{
+    background-color: red;
 }

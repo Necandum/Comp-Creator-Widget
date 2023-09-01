@@ -23,11 +23,30 @@ var e = {
         SUPPORT_SELECTION:"supportSelection",
         PLAYER:"player",
         POTENTIAL_CLASH:"potentialClash",
-}
+        MODE:"mode",
+        CREATE:"create",
+        EDIT:"edit",
+        CONTROLLED_OBJECT:"controlledObject",
+        CONTROLLED_OBJECT_CONSTRUCTOR:"controlledObjectConstructor",
+        VERIFICATION:"verificationFunctions",
+        VERIFICATION_FAILED:"verificationFailed",
+        HARVEST_FUNCTIONS:"harvestFunctions",
+        HARVESTED_DATA:"harvestedData",
+};
+
+(function () {
+    let descriptionSet = new Set();
+    let symbolSet = new Set();
+
+    for(let prop in e){
+        descriptionSet.add(e[prop]);
+        e[prop]=Symbol(e[prop])
+        symbolSet.add(e[prop]);
+    }
+
+    e.has = (isEnum)=>(descriptionSet.has(isEnum) || symbolSet.has(isEnum));
+})();
 
 
-for(let prop in e){
-    e[prop]=Symbol(e[prop])
-}
 
 Object.freeze(e);

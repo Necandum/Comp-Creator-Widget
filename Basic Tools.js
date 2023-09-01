@@ -1,6 +1,6 @@
-
-function getE(string){
-    return document.querySelector(string);
+var oLog={}
+function getE(queryString){
+    return document.querySelector(queryString);
 }
 function Break(msg,variablesObj){
     console.log("At time of error:",variablesObj);
@@ -11,6 +11,11 @@ function Alert(msg,variableObj,trace=true){
    console.log("Alert! Non-ideal behaviour.",msg,variableObj);
    if(trace) console.trace();
    return null
+}
+
+function UserError(msg,variableObj){
+    console.log("At time of user error:",variableObj);
+    throw new Error(msg)
 }
 function parseHTML(string) {
     const template = document.createElement('template');

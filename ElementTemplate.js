@@ -1,80 +1,97 @@
 var ElementTemplate = (function () {
-
-    function ElementTemplate({ htmlInsert, addEvents = [], addDataset = [], addClasses = [], addTemplates = [], label, addAsElder, onCreationCode }) {
+    let id=0;
+    function ElementTemplate({ htmlInsert,addFunctions,addDataStore,addEvents = [], addDataset = [], addClasses = [], addTemplates = [], label, addAsElder, onCreationCode, onCompletionCode }) {
 
         this.__peek = arguments[0];
         
-        this.build = function (root,{creationCodeArg}={}) {
-            let mainDiv = document.createElement('div');
+        this.build = function (root,options={useAsMainDiv:null}) {
+            let mainDiv = options.useAsMainDiv ?? document.createElement('div');
             let elder = (root) ? root.elder : {};
             let data = (root) ? root.getActualDataObject():new Map();
+            let localData = new Map();
+            data.set(mainDiv,localData);
             let uniqueKey = Symbol("Unique Key");
+            let uniqueID = ++id;
             if (addAsElder && elder[addAsElder]) Break("Cannot add two elders of same name", { args: arguments[0], addAsElder })
             if (addAsElder) elder[addAsElder] = mainDiv;
-            mainDiv.__label = label; //for debugging
+            
+
             defineGetter({ obj: mainDiv, name: "root", func: () => root });
             defineGetter({ obj: mainDiv, name: "elder", func: () => ({ ...elder }) });
-            defineGetter({ obj: mainDiv, name: "_data", func: () => data});
-            defineGetter({obj: mainDiv, name: "data", func: () => {
-                    let newData = new Map();
-                    data.forEach((elemData, elem) => { newData.set(elem, new Map(elemData)) })
-                    return newData;
-                }
-            });
-            defineGetter({ obj: mainDiv, name: "treeData", func: () => treeData});
-
+            defineGetter({ obj: mainDiv, name: "uniqueKey", func: () => uniqueKey});
+            defineGetter({ obj: mainDiv, name: "uniqueID", func: () => uniqueID});
+            defineGetter({ obj: mainDiv, name: "__data", func: () => localData});
+           
             Object.defineProperty(mainDiv, "template", { value: this,configurable: false, enumerable: true, writable: false });
+
             mainDiv.getActualDataObject = function getActualDataObject(){
                 return data;
             }
-            mainDiv.save = function save({ element, dataArr = [["key","value"]], override = true }) {
-                if (!element instanceof HTMLElement) Break("element must be a HTML element", { args: arguments[0] });
-
-                let elementDataStore =  data.get(element) ?? data.set(element,new Map()).get(element);
-
-                for (const datum of dataArr) {
-                    if (!override && elementDataStore.has(datum[0])) continue
-                    elementDataStore.set(datum[0], datum[1]);
+            mainDiv.save = function quickSave (dataStoreName, value,overide=true) {
+                if(!localData.has(dataStoreName)) Break("All data stores must be declared in template creation",{localData,addDataStore,args:arguments});
+                let dataStoreValue = mainDiv.load(dataStoreName)
+                if(!overide && dataStoreValue!==undefined) return false;
+                localData.set(dataStoreName,value)
+                return true;
+            }
+            mainDiv.load = function quickLoad(dataStoreName) {
+                return localData.get(dataStoreName);
+            }
+           
+            addFunctions:{
+                mainDiv.func ={};
+                if(!Array.isArray(addFunctions)) addFunctions = [addFunctions];
+                for(let functionItem of addFunctions){
+                    if(!Array.isArray(functionItem)) functionItem = [functionItem,functionItem.name];
+                    const [newFunc,newFuncName]=functionItem;
+                    mainDiv.func[newFuncName]=newFunc.bind(mainDiv);
                 }
-                return true
+                Object.freeze(mainDiv.func);
             }
-            mainDiv.quickSave = function quickSave (key, value) {
-               return mainDiv.save({ element: this, dataArr: [[key, value]], override: true });
-            }
-            mainDiv.quickLoad = function quickLoad(key) {
-                if (!data?.get?.(this)) Break("Cannot quick load when data element doesn't exist")
-                return data.get(this).get(key);
-            }
-            mainDiv.deleteElementDataStore= function deleteElementDataStore(key){
-                data.get(key)?.clear();
-            }
-            
-            if (htmlInsert) {
-                if (!Array.isArray(htmlInsert)) htmlInsert = [htmlInsert];
-                for (const htmlInsertItem of htmlInsert) {
-                    let htmlForInsertion;
-                    if(typeof htmlInsertItem ==="function"){
-                        htmlForInsertion = htmlInsertItem();
-                    } else if (htmlInsertItem instanceof HTMLElement || htmlInsertItem instanceof Node){
-                        htmlForInsertion= htmlInsertItem.cloneNode(true);
-                    } else if( typeof htmlInsertItem==='string'){
-                        htmlForInsertion = document.createTextNode(htmlInsertItem)
-                    }
-                    else{
-                        Break("htmlInsert must be function or HTMLElement",{htmlInsert,htmlInsertItem})
-                    }
-                    addRootToChildNodes(mainDiv, mainDiv.elder, htmlForInsertion);
-                    mainDiv.append(htmlForInsertion);
+
+            addDataStore:{
+                if(!Array.isArray(addDataStore)) addDataStore = [addDataStore];
+                for(const [newDataStoreName,newDataStoreValue] of addDataStore){
+                    localData.set(newDataStoreName,newDataStoreValue);
                 }
             }
 
-            mainDiv.classList.add(...addClasses);
+            childNodes:{
+                if (htmlInsert) {
+                    if (!Array.isArray(htmlInsert)) htmlInsert = [htmlInsert];
+                    for (const htmlInsertItem of htmlInsert) {
+                        let htmlForInsertion;
+                        if(typeof htmlInsertItem ==="function"){
+                            htmlForInsertion = htmlInsertItem(mainDiv);
+                        } else if (htmlInsertItem instanceof HTMLElement || htmlInsertItem instanceof Node){
+                            htmlForInsertion= htmlInsertItem.cloneNode(true);
+                        } else if( typeof htmlInsertItem==='string'){
+                            htmlForInsertion = document.createTextNode(htmlInsertItem)
+                        }
+                        else{
+                            Break("htmlInsert must be function or HTMLElement",{htmlInsert,htmlInsertItem})
+                        }
+                        mainDiv.append(htmlForInsertion);
+                    }
+                }
+
+                for(const childNode of mainDiv.childNodes){
+                 addRootToChildNodes(mainDiv, mainDiv.elder, childNode);
+                }
+            }
+            classes:{
+                if(addClasses){
+                    if(!Array.isArray(addClasses)) addClasses = [addClasses];
+                    mainDiv.classList.add(...addClasses);
+                }
+            }
 
             for (const newDataset of addDataset) {
                 mainDiv.dataset[newDataset.name] = newDataset.value;
             }
 
             for (const newEvent of addEvents) {
+                if(!newEvent) continue;
                 let elements;
                 if (!newEvent.queryselection) {
                     elements = [mainDiv]
@@ -83,7 +100,6 @@ var ElementTemplate = (function () {
                     elements = (queryResult.length>0) ? Array.from(queryResult)
                                                       : (newEvent.selfBackUp) ? [mainDiv]
                                                                               : Alert("Failed to find elements by query selection", { newEvent, addEvents, mainDiv, htmlInsert })
-
                 }
                 for (const trigger of newEvent.triggers) {
                     for(const element of elements){
@@ -92,13 +108,16 @@ var ElementTemplate = (function () {
                 }
             }
 
-            if (onCreationCode && typeof onCreationCode === "function") onCreationCode(mainDiv,creationCodeArg);
+            if (onCreationCode && typeof onCreationCode === "function") onCreationCode(mainDiv,options);
 
-            for (const template of addTemplates) {
-                if (!template instanceof ElementTemplate) Break("addTemplates must be array of ElementTemplators", { addTemplates })
-                mainDiv.append(template.build(mainDiv))
+            for (const [template,templateOptions] of addTemplates) {
+                if (!template instanceof ElementTemplate) Break("addTemplates must be array of ElementTemplators and option pairs", { addTemplates })
+                mainDiv.append(template.build(mainDiv,templateOptions))
             }
 
+            if (onCompletionCode && typeof onCompletionCode === "function") onCompletionCode(mainDiv,options);
+
+            mainDiv.__label = label ?? addClasses?.toString() ?? addAsElder; //for debugging
             return mainDiv
         }
 
@@ -106,6 +125,7 @@ var ElementTemplate = (function () {
     };
 
     ElementTemplate.eventObjMaker = function eventObjMaker({ triggers = ["click"], func, options = false, selfBackUp = false, queryselection }) {
+        if(!Array.isArray(triggers)) triggers=[triggers];
         return { triggers, func, options, selfBackUp, queryselection }
     }
 

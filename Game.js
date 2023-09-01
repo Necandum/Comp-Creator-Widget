@@ -9,7 +9,6 @@ var Game = (function () {
         let customGameStages = null;
         let myId = ++id;
         let thisGame = this;
-        let associatedDivFlesh;
         defineGetter({ obj: this, name: "outgoingLinks", func: () => Array.from(links.keys()).filter((cv) => cv.source === this) });
         defineGetter({ obj: this, name: "incomingLinks", func: () => Array.from(links.keys()).filter((cv) => cv.target === this) });
         defineGetter({ obj: this, name: "ancestralLinks", func: () => ancestralLinksRegistrar.ancestralLinks });
@@ -20,15 +19,11 @@ var Game = (function () {
         defineGetter({ obj: this, name: "id", func: () => myId });
         defineGetter({ obj: this, name: "name", func: () => `Game ${myId}` });
         defineGetter({ obj: this, name: "validity", func: () => validity.copy()});
-        defineGetter({
-            obj: this, name: "gameStages", func: () => (customGameStages) ? customGameStages :
-                this.phase.currentSettings.get(e.GAME_STAGES)
+        defineGetter({obj: this, name: "gameStages", func: () => (customGameStages) ? customGameStages :
+                                                                                      this.phase.currentSettings.get(e.GAME_STAGES)
         });
         defineGetter({ obj: this, name: "length", func: () => parseInt(this.gameStages.at(-1).endAtMiliSecond)});
 
-        defineSetter({ obj: this, name: "flesh", func: (mainDiv) => associatedDivFlesh=mainDiv });
-        defineGetter({ obj: this, name: "flesh", func: () => associatedDivFlesh });
-      
         this.newIncomingLink = function ({ source, sourceRank }) {
             return new Link({ target: this, source, sourceRank });
         }

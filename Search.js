@@ -1,8 +1,7 @@
 function searchMap({map,property=undefined,searchTerm="",excludeKey=false,excludeValue=false,searchFunc}){
     let allEntries = map.entries();
     let resultArray =[]
-    for(let entry of allEntries){
-        let [key,value] = entry;
+    for(let [key,value] of allEntries){
         if(!excludeKey) searchObject({property,searchTerm,obj:key,resultArray,searchFunc})
         if(!excludeValue) searchObject({property,searchTerm,obj:value,resultArray,searchFunc})
     }

@@ -27,7 +27,7 @@ var Team = (function () {
                     allTeams.set(newValue,this);
                     name = newValue;
                     CodeObserver.Execution({mark:Team,currentFunction:changeDetail,currentObject:this});
-                    break;
+                    break; 
             }
         }
 
@@ -38,6 +38,7 @@ var Team = (function () {
 
             teamPlayers.set(player,jerseyNumber);
             teamJerseyNumbers.set(jerseyNumber,player);
+            player.addTeam(this);
 
             return this
          }
@@ -45,7 +46,8 @@ var Team = (function () {
         this.removePlayer = function (player) {
             if(!(player instanceof Player)) throw new Error('Not a Player');
 
-            teamJerseyNumbers.delete(teamPlayers.get(player))
+            teamJerseyNumbers.delete(teamPlayers.get(player));
+            player.removeTeam(this);
             return teamPlayers.delete(player);
         }
 

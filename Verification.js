@@ -136,7 +136,7 @@ var Objection = (function(){
 return Objection
 })()
 Object.freeze(Objection);
-
+    
 var ValidityTracker = (function(){ 
 
     function ValidityTracker(initialState=true){

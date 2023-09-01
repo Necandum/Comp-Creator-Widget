@@ -20,9 +20,6 @@ var Block = (function () {
             games.forEach(iGame=>allIncomingLinks.push(...iGame.incomingLinks));
             return allIncomingLinks;
         } });
-        defineGetter({ obj: this, name: "flesh", func: () => associatedDivFlesh });
-        defineSetter({ obj: this, name: "flesh", func: (mainDiv) => associatedDivFlesh=mainDiv });
-
         
         this.newGame = function newGame() {
             let game = new Game(this);

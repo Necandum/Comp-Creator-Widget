@@ -14,7 +14,6 @@ var Phase = (function () {
             [e.SUPPORT_SELECTION,e.PREDETERMINED] //e.PREDETERMINED or e.TOURNAMENT
         ])
         let blocks = [];
-        let divisions = [];
         let links = new Set();
         let validity = new ValidityTracker(true);
         let ancestralLinksRegistrar = new AncestorRegistry(this,{selectedRegistrar:UniqueSourceRankRegistry});
@@ -44,8 +43,6 @@ var Phase = (function () {
         defineGetter({ obj: this, name: "maxPossibleTeams", func: () => Array.from(this.ancestralLinks).filter(x=>x.source instanceof Team).length });
         defineGetter({ obj: this, name: "validity", func: () => validity.copy()});
         defineGetter({ obj: this, name: "phaseType", func: () => phaseType});
-        defineGetter({ obj: this, name: "flesh", func: () => associatedDivFlesh });
-        defineSetter({ obj: this, name: "flesh", func: (mainDiv) => associatedDivFlesh=mainDiv });
 
         this.newBlock = function (newBlockName) {
             let newBlock = new Block({ parent: this, name: newBlockName })

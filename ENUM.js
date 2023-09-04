@@ -32,6 +32,22 @@ var e = {
         VERIFICATION_FAILED:"verificationFailed",
         HARVEST_FUNCTIONS:"harvestFunctions",
         HARVESTED_DATA:"harvestedData",
+        DISPLAY_ALL:"displayAll",
+        DISPLAY_NOT_PLAYERS:"displayNotPlayers",
+        STACK:"stack",
+        CURRENTLY_OPEN:"currentlyOpen",
+        CONTENTS:"contents",
+        FIELD_NAME:"fieldName",
+        SECTION_PARAMETERNS:"sectionParameters",
+        MASTER:"maste",
+        LEFT_SLAVE:"leftSlave",
+        RIGHT_SLAVE:"rightSlave",
+        IDENTITY:"identity",
+        DEFAULT:"default",
+        MULTY_SELECT_START:"multySelectStart",
+        
+        
+
 };
 
 (function () {

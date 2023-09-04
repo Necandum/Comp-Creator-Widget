@@ -9,7 +9,8 @@ function Break(msg,variablesObj){
 
 function Alert(msg,variableObj,trace=true){
    console.log("Alert! Non-ideal behaviour.",msg,variableObj);
-   if(trace) console.trace();
+//    if(trace) 
+   console.trace();
    return null
 }
 

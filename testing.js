@@ -1,198 +1,29 @@
-let mEvent = {
-    click: new Event("click", { bubbles: true }),
-    input: new Event("input", { bubbles: true }),
-    focusOut: new Event("focusout", { bubbles: true }),
-    focusIn: new Event("focusin", { bubbles: true })
-}
-let oLog ={};
+new Player({firstName:"A",lastName:"a"})
+new Player({firstName:"O",lastName:"a"})
+new Player({firstName:"E",lastName:"a"})
+new Player({firstName:"U",lastName:"a"})
 
-let teams = {
-  
-}
-let ta = newTeam("A")
-let tb =newTeam("B")
-let tc = newTeam("C")
-newTeam("D")
-newTeam("E")
-newTeam("F")
-newTeam("G")
-newTeam("H")
+let diva = new Division("A")
+let divaa = new Division("A.A")
+let divab = new Division("A.B")
+let divaaa=new Division("A.A.A");
+diva.add(divaa);
+diva.add(divab);
+divaa.add(divaaa);
 
-// let diva = new Division("A");
-// let divb= new Division("B");
-// let divC = new Division("C");
-// console.log(
-// diva.add(ta),
-// divb.add(tb),
-// diva.add(divb),
-// "Recursive add",
-// divb.add(diva),
-// divC.add(divb),
-// diva.add(divC),
-// divC.add(tc),
-// diva.teams,
-// diva.subDivisions,
-// diva.allTeams,
-// diva.allSubDivisions);
+let t1 = new Team("1")
+let t2 = new Team("2")
+let t3 = new Team("3")
+let t4 = new Team("4")
+let t5 = new Team("5")
+let t6 = new Team("6")
+let t7 = new Team("7")
+let t8 = new Team("8")
 
-let phases = {
-}
-
-let blocks = {
-}
-
-let games = {
-}
-
-function newTeam(name) {
-    let teamInput = Array.from(document.querySelectorAll(".teamInput input")).at(-1);
-    teamInput.dispatchEvent(mEvent.focusIn);
-    teamInput.value = name;
-    teamInput.dispatchEvent(mEvent.focusOut);
-    let newTeam = Team.allTeams.get(name)
-    teams[newTeam.id] = newTeam;
-    return newTeam;
-}
-
-function newPhase({ name = "X", phaseType = e.ROUND_ROBIN, phasePriority = 1 } = {}) {
-
-    let phase = comp.newPhase(name, phaseType);
-    phase.changeSetting(e.PRIORITY, phasePriority);
-    let phaseContainer = TableGenerator.bracketTable.phaseTemplate.build(comp.flesh, { creationCodeArg: phase })
-    comp.flesh.append(phaseContainer)
-    phases[phaseContainer.spirit.id] = phaseContainer.spirit;
-    blocks[phaseContainer.spirit.id]={[phaseContainer.spirit.allBlocksArray[0].blockOrder]:phaseContainer.spirit.allBlocksArray[0]}
-    games[phaseContainer.spirit.id]={
-                        [phaseContainer.spirit.allBlocksArray[0].blockOrder]:{
-                            [phaseContainer.spirit.allBlocksArray[0].allGamesArray[0].gameOrder]:phaseContainer.spirit.allBlocksArray[0].allGamesArray[0]
-                        }};
-                                      
-
-    return phaseContainer.spirit;
-}
-
-function newBlock(phase) {
-    let blockContainer = TableGenerator.bracketTable.blockTemplate.build(phase.flesh)
-    phase.flesh.append(blockContainer)
-    blocks[phase.id][blockContainer.spirit.blockOrder]= blockContainer.spirit;
-    games[phase.id][blockContainer.spirit.blockOrder]={[blockContainer.spirit.allGamesArray[0].gameOrder]:blockContainer.spirit.allGamesArray[0]}
-    return blockContainer.spirit;
-}
-
-function newGame(block) {
-    let gameContainer = TableGenerator.bracketTable.gameTemplate.build(block.flesh);
-    block.flesh.append(gameContainer);
-    games[block.parent.id][block.blockOrder][gameContainer.spirit.gameOrder] = gameContainer.spirit;
-    return gameContainer.spirit;
-}
-
-function setLink(game, { index = 0, source,sourceRank=1 }) {
-    let sourceTypeSelect = game.flesh.querySelectorAll(".sourceTypeSelect")[index];
-    sourceTypeSelect.querySelector(`[data-source-type='${source.constructor.name}']`).selected = true;
-    sourceTypeSelect.dispatchEvent(mEvent.input);
-    let sourceSelect = game.flesh.querySelectorAll(".sourceSelect")[index];
-    let sourceOption = sourceSelect.root.data.get(sourceSelect).get(source);
-    sourceOption.selected = true;
-    game.flesh.querySelectorAll(".sourceRankInput")[index].value=sourceRank;
-    sourceSelect.dispatchEvent(mEvent.input)
-}
-Verification.pause();
-newPhase({phaseType:e.TOURNAMENT,name:"T"}).changeSetting(e.SUPPORT_TEAMS,new Set([...Team.allTeams.values()]));
-newGame(blocks[1][1])
-newBlock(phases[1])
-newGame(blocks[1][2])
-newBlock(phases[1])
-
-
-
-newPhase({phaseType:e.ROUND_ROBIN,name:"RR"}).changeSetting(e.SUPPORT_SELECTION,e.TOURNAMENT)
-newGame(blocks[2][1])
-newBlock(phases[2])
-newGame(blocks[2][2])
-newBlock(phases[2])
-//Phase 1 Set links
-setLink(games[1][1][1], { index: 0, source: teams[1] })
-setLink(games[1][1][1], { index: 1, source: teams[2] })
-setLink(games[1][1][2], { index: 0, source: teams[3] })
-setLink(games[1][1][2], { index: 1, source: teams[4] })
-
-setLink(games[1][2][1], { index: 0, source: games[1][1][1],sourceRank:1 })
-setLink(games[1][2][1], { index: 1, source: games[1][1][1],sourceRank:2 })
-setLink(games[1][2][2], { index: 0, source: games[1][1][2],sourceRank:1 })
-setLink(games[1][2][2], { index: 1, source: games[1][1][2],sourceRank:2 })
-
-setLink(games[1][3][1], { index: 0, source: games[1][2][1],sourceRank:1 })
-setLink(games[1][3][1], { index: 1, source: games[2][1][1],sourceRank:2 })
-// //Phase 2 set links
-setLink(games[2][1][1], { index: 0, source: teams[5] })
-setLink(games[2][1][1], { index: 1, source: teams[6] })
-setLink(games[2][1][2], { index: 0, source: teams[7] })
-setLink(games[2][1][2], { index: 1, source: teams[8] })
-
-setLink(games[2][2][1], { index: 0, source: games[2][1][1],sourceRank:1 })
-setLink(games[2][2][1], { index: 1, source: games[2][1][1],sourceRank:2 })
-setLink(games[2][2][2], { index: 0, source: games[1][1][2],sourceRank:1 })
-setLink(games[2][2][2], { index: 1, source: games[1][1][2],sourceRank:2 })
-
-setLink(games[2][3][1], { index: 0, source: games[1][2][1],sourceRank:1 })
-setLink(games[2][3][1], { index: 1, source: games[1][2][2],sourceRank:1 })
-
-//Infinite Phases
-let currentPhase = 3;
-let maxPhase = 2;
-//Infinite Phase New 
-for(currentPhase;currentPhase<=maxPhase;currentPhase++){
-newPhase({phaseType:e.TOURNAMENT,name:`Tour ${currentPhase}`})
-newGame(blocks[currentPhase][1])
-newBlock(phases[currentPhase])
-newGame(blocks[currentPhase][2])
-
-setLink(games[currentPhase][1][1], { index: 0, source: teams[5] })
-setLink(games[currentPhase][1][1], { index: 1, source: teams[6] })
-setLink(games[currentPhase][1][2], { index: 0, source: teams[7] })
-setLink(games[currentPhase][1][2], { index: 1, source: teams[8] })
-
-setLink(games[currentPhase][2][1], { index: 0, source: games[currentPhase][1][1],sourceRank:1 })
-setLink(games[currentPhase][2][1], { index: 1, source: games[currentPhase][1][1],sourceRank:2 })
-setLink(games[currentPhase][2][2], { index: 0, source: games[currentPhase][1][2],sourceRank:1 })
-setLink(games[currentPhase][2][2], { index: 1, source: games[currentPhase][1][2],sourceRank:2 })
-}
-
-
-
-
-
-Verification.unPause();
-
-var testingRestrictions=[new Scheduler.Restriction(0,2,35*60*1000,45*60*1000,e.FIELD_CLOSURE,"Field Closed","Bugger Off")];
-// s.scheduleAll();
-testingRestrictions.new = function(startField,endField,startMin,endMin,name,description){
-   return this.push(new Scheduler.Restriction(startField,endField,startMin*60*1000,endMin*60*1000,e.FIELD_CLOSURE,name,description))
-}
-
-
-// let a = new TimeMap();
-// a.set("1",{startTime:0,endTime:50})
-// a.set("2",{startTime:30,endTime:50})
-// a.set("3",{startTime:50,endTime:75})
-// a.set("3.1",{startTime:51,endTime:75})
-// a.set("4",{startTime:80,endTime:101})
-// a.set("4.1",{startTime:80,endTime:100})
-// a.set("5",{startTime:100,endTime:120})
-// a.set("6",{startTime:150,endTime:160})
-// a.set("7",{startTime:155,endTime:190})
-// a.set("8",{startTime:156,endTime:300})
-// a.set("9",{startTime:200,endTime:280})
-
-// // console.log(a.findOverlap(50),"overal 50");
-// // console.log(a.findOverlap(76),"overlap 76");
-// // console.log(a.findOverlap(250),"overlap 250");
-// console.log(a.findGap(50))
-// console.log(a.findGap(80))
-// console.log(a.findGap(130))
-// console.log(a.findGap(200))
-// a.delete("8")
-// console.log(a.findGap(200))
-// a.set("8",{startTime:156,endTime:400})
-// a.set("8",{startTime:410,endTime:20})
-// console.log(a.findGap(200))
+diva.add(t1)
+diva.add(t2)
+divaa.add(t3)
+divab.add(t4)
+divaaa.add(t5)
+getE("div.navigationPanel").func.openObject(Player);
+oLog.testNav =(x)=> getE("div.navigationPanel").func.openObject(x);

@@ -33,7 +33,7 @@
                             
                         </div>
                         <div id="competitorPlayerTab">
-                            <form data-controlled-object="Player">
+                            <form data-controlled-object-constructor="Player">
                                 <h1 data-mode='create'>Create Player</h1>
                                 <h1 data-mode='edit'>Edit Player</h1>
                                 <div class="inputContainer" data-object-field="firstName"><label>First Name: <input type="text" value="5" /></label></div>
@@ -46,6 +46,8 @@
                                 <!-- Search result for each field -->
                             </section>
                             <nav>
+                                
+                                
                                 <!-- navigation panes to explore existing all players/divisions/teams -->
                                 <!-- selected teams should appear in form as teams player is also added to, along with jersey number -->
                             </nav>
@@ -63,14 +65,18 @@
 
     
 </body>
-
+<!-- Building blocks, nil dependancies -->
 <script src="Basic Tools.js"></script>
+<script src="ENUM.js"></script>
 <script src="TimeMap.js"></script>
+<script src="ElementTemplate.js"></script>
+<!-- Building structures, some dependancies -->
 <script src="CodeObserver.js"></script>
+<script src="EventHandling.js"></script>
 <script src="Verification.js"></script>
 <script src="Registry.js"></script>
-<script src="ENUM.js"></script>
 <script src="Search.js"></script>
+<!-- Agents -->
 <script src="Player.js"></script>
 <script src="Team.js"></script>
 <script src="Division.js"></script>
@@ -79,9 +85,9 @@
 <script src="Block.js"></script>
 <script src="Game.js"></script>
 <script src="Link.js"></script>
+<!-- Outcome producers -->
 <script src="Scheduler.js"></script>
 <script src="SupportScheduler.js"></script>
-<script src="ElementTemplate.js"></script>
 <script src="CSVGenerator.js"></script>
 <script src="UIManager.js"></script>
 <!-- Set-up code necessary for things to run -->
@@ -90,7 +96,7 @@
 
 <!-- Display elements on page  -->
 <script src="Init.js"></script>
-<!-- <script src="testing.js"></script> -->
+<script src="testing.js"></script>
 
 
 

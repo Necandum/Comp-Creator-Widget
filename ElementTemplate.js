@@ -40,17 +40,21 @@ var ElementTemplate = (function () {
            
             addFunctions:{
                 mainDiv.func ={};
-                if(!Array.isArray(addFunctions)) addFunctions = [addFunctions];
-                for(let functionItem of addFunctions){
-                    if(!Array.isArray(functionItem)) functionItem = [functionItem,functionItem.name];
-                    const [newFunc,newFuncName]=functionItem;
-                    mainDiv.func[newFuncName]=newFunc.bind(mainDiv);
+                if(addFunctions){
+                    if(!Array.isArray(addFunctions)) addFunctions = [addFunctions];
+                    for(let functionItem of addFunctions){
+                        if(!Array.isArray(functionItem)) functionItem = [functionItem,functionItem.name];
+                        const [newFunc,newFuncName]=functionItem;
+                        mainDiv.func[newFuncName]=newFunc.bind(mainDiv);
+                    }
                 }
                 Object.freeze(mainDiv.func);
             }
 
             addDataStore:{
+                if(!addDataStore) break addDataStore;
                 if(!Array.isArray(addDataStore)) addDataStore = [addDataStore];
+                if(!Array.isArray(addDataStore[0])) addDataStore = [addDataStore];
                 for(const [newDataStoreName,newDataStoreValue] of addDataStore){
                     localData.set(newDataStoreName,newDataStoreValue);
                 }
@@ -108,14 +112,19 @@ var ElementTemplate = (function () {
                 }
             }
 
-            if (onCreationCode && typeof onCreationCode === "function") onCreationCode(mainDiv,options);
+            if (onCreationCode && typeof onCreationCode === "function") onCreationCode.call(mainDiv,mainDiv,options);
 
-            for (const [template,templateOptions] of addTemplates) {
-                if (!template instanceof ElementTemplate) Break("addTemplates must be array of ElementTemplators and option pairs", { addTemplates })
-                mainDiv.append(template.build(mainDiv,templateOptions))
-            }
+            addTemplates: { 
+                            if(!Array.isArray(addTemplates)) addTemplates = [addTemplates];
+                            for (let item of addTemplates) {
+                                if(!Array.isArray(item)) item = [item]
+                                const [template,templateOptions] = item;
+                                if (!template instanceof ElementTemplate) Break("addTemplates must be array of ElementTemplators and option pairs", { addTemplates })
+                                mainDiv.append(template.build(mainDiv,templateOptions))
+                            }
+                          }
 
-            if (onCompletionCode && typeof onCompletionCode === "function") onCompletionCode(mainDiv,options);
+            if (onCompletionCode && typeof onCompletionCode === "function") onCompletionCode.call(mainDiv,mainDiv,options);
 
             mainDiv.__label = label ?? addClasses?.toString() ?? addAsElder; //for debugging
             return mainDiv

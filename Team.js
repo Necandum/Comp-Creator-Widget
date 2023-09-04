@@ -8,6 +8,7 @@ var Team = (function () {
         let myId = ++id;
         let teamPlayers = new Map();
         let teamJerseyNumbers = new Map();
+        let divisions = new Set();
 
 
         allTeams.set(name,this)
@@ -15,6 +16,7 @@ var Team = (function () {
         defineGetter({ obj: this, name: "id", func: () => myId });
         defineGetter({ obj: this, name: "players", func: () => new Map(teamPlayers.entries())});
         defineGetter({ obj: this, name: "ancestralLinks", func: () => new Set()});
+        defineGetter({ obj: this, name: "divisions", func: () => new Set(divisions)});
 
         this.deleteTeam = function(){
             allTeams.delete(this.name);
@@ -30,7 +32,12 @@ var Team = (function () {
                     break; 
             }
         }
-
+        this.addToDivision=function(division){
+            divisions.add(division);
+        }
+        this.removeFromDivision=function(division){
+            divisions.delete(division);
+        }
         this.addPlayer = function (player,jerseyNumber) {
             if(!(player instanceof Player)) throw new Error('Not a Player');
             if(teamJerseyNumbers.has(jerseyNumber)) throw new Error ("Jersey Number Taken")

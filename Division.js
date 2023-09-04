@@ -5,10 +5,12 @@ var Division = (function(){
 
     function Division(name){
         let divisionContent = new Set();
+        let divisionParents = new Set();
         let myId = ++id;
         allDivisions.add(this);
 
         defineGetter({ obj: this, name: "contents", func: () => new Set(divisionContent)});
+        defineGetter({ obj: this, name: "parentDivisions", func: () => new Set(divisionParents)});
         defineGetter({ obj: this, name: "name", func: () => name });
         defineGetter({ obj: this, name: "id", func: () => myId });
         defineGetter({ obj: this, name: "teams", func: () => new Set(Array.from(divisionContent).filter(value=>value instanceof Team))});
@@ -30,6 +32,8 @@ var Division = (function(){
 
         this.deleteDivision = function(){
             allDivisions.delete(this);
+            divisionParents.forEach(parentDivision=>parentDivision.remove(this));
+            divisionContent.forEach(teamOrDivision=>teamOrDivision.removeFromDivision(this));
         }
 
         this.changeDetail = function (detail, newValue) {
@@ -42,15 +46,24 @@ var Division = (function(){
 
         this.add = function (teamOrDivision) {
             if(!(teamOrDivision instanceof Team)&&!(teamOrDivision instanceof Division)) Break("can only add teams or other divisions to a division",{teamOrDivision})
-            
-            return checkForLoop(this,teamOrDivision) ? null:divisionContent.add(teamOrDivision);
+           if(checkForLoop(this,teamOrDivision)) return false 
+           divisionContent.add(teamOrDivision);
+           teamOrDivision.addToDivision(this)
+           return true;
          }
 
         this.remove = function (teamOrDivision) {
             if(!(teamOrDivision instanceof Team)&&!(teamOrDivision instanceof Division)) Break("can only add teams or other divisions to a division",{teamOrDivision})
-           return divisionContent.delete(teamOrDivision)
+            divisionContent.delete(teamOrDivision)
+            teamOrDivision.removeFromDivision(this);
+            return true 
         }
-
+        this.addToDivision=function(division){
+            divisionParents.add(division);
+        }
+        this.removeFromDivision=function(division){
+            divisionParents.delete(division);
+        }
         function checkForLoop(currentDiv,newDiv){
             if(!(currentDiv instanceof Division) || !(newDiv instanceof Division)) return false;
             if(currentDiv===newDiv) return true;

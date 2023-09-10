@@ -1,13 +1,14 @@
 var Division = (function(){ 
     let id = 0
-    let allDivisions = new Set();
-    defineGetter({ obj: Division, name: "allDivisionsArray", func: () => Array.from(allDivisions) });
+    let allDivisions = new Map();
+    defineGetter({ obj: Division, name: "allDivisionsArray", func: () => Array.from(allDivisions.values()) });
 
-    function Division(name){
+    function Division({name}){
+        if(allDivisions.has(name)) Break("Division already exists",{divisions:Division.allDivisionsArray,name})
         let divisionContent = new Set();
         let divisionParents = new Set();
         let myId = ++id;
-        allDivisions.add(this);
+        allDivisions.set(name,this);
 
         defineGetter({ obj: this, name: "contents", func: () => new Set(divisionContent)});
         defineGetter({ obj: this, name: "parentDivisions", func: () => new Set(divisionParents)});
@@ -31,9 +32,10 @@ var Division = (function(){
         ) )});
 
         this.deleteDivision = function(){
-            allDivisions.delete(this);
+            allDivisions.delete(this.name);
             divisionParents.forEach(parentDivision=>parentDivision.remove(this));
             divisionContent.forEach(teamOrDivision=>teamOrDivision.removeFromDivision(this));
+            name="Deleted"
         }
 
         this.changeDetail = function (detail, newValue) {
@@ -69,6 +71,14 @@ var Division = (function(){
             if(currentDiv===newDiv) return true;
             if(newDiv.allSubDivisions.has(currentDiv)) return true;
             return false;
+        }
+        this.updateSettings = function(newSettings){
+            if(newSettings.name){
+                if(allDivisions.has(newSettings.name)) return false;
+                allDivisions.delete(name);
+                name = newSettings.name;
+                allDivisions.set(name,this);
+            }
         }
     }
 

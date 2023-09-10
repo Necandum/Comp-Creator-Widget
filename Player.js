@@ -17,9 +17,11 @@ var Player= (function(){
         return results;
     }
      
-    function Player(values={firstName:"",lastName:"",preferredName:"",comment:""}){
+    function Player({firstName,lastName,preferredName,comment}={}){
+        let values = {firstName,lastName,preferredName,comment};
+
+        if(values.firstName===undefined || values.lastName===undefined) UserError("Cannot create player no first or last name",{firstName,lastName});
        if(Player.search({firstName:values.firstName,lastName:values.lastName}).size>0) UserError("Cannot create player with same first and last name",{firstName,lastName});
-       if(values.firstName==="" || values.lastName==="") UserError("Cannot create player no first or last name",{firstName,lastName});
 
        let myId=++id;
        allPlayers.set(this,new Set()) //Set of teams player is in
@@ -33,10 +35,18 @@ var Player= (function(){
 
         this.addTeam =(team)=>allPlayers.get(this).add(team);
         this.deleteTeam = (team)=>allPlayers.get(this).delete(team);
-        this.deletePlayer = ()=>allPlayers.delete(this);
-
+        this.deletePlayer = ()=>{
+            const teams = allPlayers.get(this);
+            for(const team of teams){
+                team.removePlayer(this);
+            }
+            allPlayers.delete(this);
+            values={firstName:"Deleted"}
+        }
+        this.removeTeam=function(team){
+            allPlayers.get(this).delete(team);
+        }
        this.updateSettings = function (newSettings={}){
-        console.log("args",arguments[0])
             for(const property in newSettings){
                 if(values.hasOwnProperty(property)){
                     values[property]=newSettings[property];

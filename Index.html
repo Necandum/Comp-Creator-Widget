@@ -5,46 +5,149 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="testing.css">
+    <link rel="stylesheet" href="Styles/General Style.css">
+    <link rel="stylesheet" href="Styles/Menus.css">
+    <link rel="stylesheet" href="Styles/Competitor.css">
+    <link rel="stylesheet" href="Styles/Navigator.css">
     <title>Document</title>
 </head>
 <body>
     <div id="widgetMainDiv">
-        <div id="configurationMenuContainer">
-            Config Menu
-            <ul id="configurationMenu">
-                <li> Competitor Set-up</li>
-                <li> Bracket Creation</li>
-                <li> Scheduling</li>
-            </ul>
+        <div id="topMenuContainer">
+            <nav id="configurationMenuContainer">
+                <ul id="configurationMenu">
+                    <li > Competitor Set-up</li>
+                    <li class="toggleSelection"> Bracket Creation</li>
+                    <li> Scheduling</li>
+                </ul>
+            </nav>
+            <section id="sectionMenus">
+                <nav id="competitorSectionMenuContainer" class="hiddenByDefault ">
+                    <ul id="competitorSectionMenu">
+                        <li><div><div>  </div> </div></li>
+                        <li><div><div> Divisions </div> </div></li>
+                        <li><div><div> Teams  </div></div></li>
+                        <li><div><div> Players  </div></div></li>
+                        <li class="toggleSelection"><div><div> Combined  </div></div></li>
+                    </ul>
+                </nav>  
+                <menu id="bracketSectionMenuContainer" class="hiddenByDefault toggleSelection">
+                    <li>
+                        <form data-controlled-object-constructor="Competition">
+                            <div class="inputContainer" data-object-field="name">
+                                <label>Competition Name: <input type="text" /><button type='button'> Update</button></label>
+                                
+                            </div>
+                        </form>
+                    </li>
+                </menu>
+            </section>    
         </div>
+            
         <div id="displayArea">
-            Display Area
             <div id="configurationSectionContainer">
 
-                <div id="competitorSection">
-                    <div id="competitorSectionMenu">
-
-                    </div>
+                <div id="competitorSection" class="hiddenByDefault">
+                    
                     <div id="competitorSectionDisplayArea">
-                        <div id="competitorTeamTab">
-                            
+
+                        <div id="competitorDivisionTab" class="hiddenByDefault competitorTab">
+                            <div>
+                                <div>
+                                    <form data-controlled-object-constructor="Division">
+                                        <h1 data-mode='create' class="hiddenByDefault">Create Division <span></span></h1>
+                                        <h1 data-mode='edit' class="hiddenByDefault">Edit Division</h1>
+                                        <div class="inputContainer" data-object-field="name"><label>First Name: <input type="text" /></label></div>
+                                        <!-- text inputs to make a new player and buttons to create -->
+                                    </form>
+                                    <section>
+                                        <!-- Search result for each field -->
+                                    </section>
+                                </div>
+                            </div>
+                            <nav>
+                                
+                                
+                                <!-- navigation panes to explore existing all players/divisions/teams -->
+                                <!-- selected teams should appear in form as teams player is also added to, along with jersey number -->
+                            </nav>
                         </div>
-                        <div id="competitorDivisionTab">
-                            
+
+                        <div id="competitorTeamTab" class="hiddenByDefault competitorTab">
+                            <div>
+                                <div>
+                                    <form data-controlled-object-constructor="Team">
+                                        <h1 data-mode='create' class="hiddenByDefault">Create Team <span></span></h1>
+                                        <h1 data-mode='edit' class="hiddenByDefault">Edit Team</h1>
+                                        <div class="inputContainer" data-object-field="name"><label>First Name: <input type="text" /></label></div>
+                                        <!-- text inputs to make a new player and buttons to create -->
+                                    </form>
+                                    <section>
+                                        <!-- Search result for each field -->
+                                    </section>
+                                </div>
+                            </div>
+                            <nav>
+                                
+                                
+                                <!-- navigation panes to explore existing all players/divisions/teams -->
+                                <!-- selected teams should appear in form as teams player is also added to, along with jersey number -->
+                            </nav>
                         </div>
-                        <div id="competitorPlayerTab">
-                            <form data-controlled-object-constructor="Player">
-                                <h1 data-mode='create'>Create Player</h1>
-                                <h1 data-mode='edit'>Edit Player</h1>
-                                <div class="inputContainer" data-object-field="firstName"><label>First Name: <input type="text" value="5" /></label></div>
-                                <div class="inputContainer" data-object-field="preferredName"><label>Preferred Name: <input type="text" value="5" /></label></div>
-                                <div class="inputContainer" data-object-field="lastName"><label>Last Name: <input type="text" value="5"/></label></div>
-                                <div class="inputContainer" data-object-field="comment"><label>Comment: <input type="text" value="5"/></label></div>
-                                <!-- text inputs to make a new player and buttons to create -->
-                            </form>
-                            <section>
-                                <!-- Search result for each field -->
-                            </section>
+
+
+                        <div id="competitorPlayerTab" class="hiddenByDefault competitorTab">
+                            <div>
+                                <div>
+                                    <form data-controlled-object-constructor="Player">
+                                        <h1 data-mode='create' class="hiddenByDefault">Create Player <span></span></h1>
+                                        <h1 data-mode='edit' class="hiddenByDefault">Edit Player</h1>
+                                        <div class="inputContainer" data-object-field="firstName"><label>First Name: <input type="text" /></label></div>
+                                        <div class="inputContainer" data-object-field="lastName"><label>Last Name: <input type="text" /></label></div>
+                                        <div class="inputContainer" data-object-field="preferredName"><label>Preferred Name: <input type="text" /></label></div>
+                                        <div class="inputContainer" data-object-field="comment"><label>Comment: <input type="text"/></label></div>
+                                        <!-- text inputs to make a new player and buttons to create -->
+                                    </form>
+                                    <section>
+                                        <!-- Search result for each field -->
+                                    </section>
+                                </div>
+                            </div>
+                            <nav>
+                                <!-- navigation panes addd via javascript -->
+                            </nav>
+                        </div>
+
+                        <div id="competitorCombinedTab" class="hiddenByDefault toggleSelection competitorTab">
+                            
+                             <div>
+                                 <div>
+                                     <form data-controlled-object-constructor="Player">
+                                        <h1 data-mode='create' class="hiddenByDefault">Create Player <span></span></h1>
+                                        <h1 data-mode='edit' class="hiddenByDefault">Edit Player</h1>
+                                        <div class="inputContainer" data-object-field="firstName"><label>First Name: <input type="text" /></label></div>
+                                        <div class="inputContainer" data-object-field="lastName"><label>Last Name: <input type="text"/></label></div>
+                                        <div class="inputContainer" data-object-field="preferredName"><label>Preferred Name: <input type="text" /></label></div>
+                                        <div class="inputContainer" data-object-field="comment"><label>Comment: <input type="text"/></label></div>
+                                        <!-- text inputs to make a new player and buttons to create -->
+                                                                 </form>
+                                        <form data-controlled-object-constructor="Team">
+                                        <h1 data-mode='create' class="hiddenByDefault">Create Team <span></span></h1>
+                                        <h1 data-mode='edit' class="hiddenByDefault">Edit Team</h1>
+                                        <div class="inputContainer" data-object-field="name"><label>First Name: <input type="text" /></label></div>
+                                        <!-- text inputs to make a new player and buttons to create -->
+                                                                 </form>
+                                                                 <form data-controlled-object-constructor="Division">
+                                        <h1 data-mode='create' class="hiddenByDefault">Create Division <span></span></h1>
+                                        <h1 data-mode='edit' class="hiddenByDefault">Edit Division</h1>
+                                        <div class="inputContainer" data-object-field="name"><label>First Name: <input type="text" /></label></div>
+                                        <!-- text inputs to make a new player and buttons to create -->
+                                                                 </form>
+                                                                 <section>
+                                        <!-- Search result for each field -->
+                                                                 </section>
+                                 </div>
+                             </div>
                             <nav>
                                 
                                 
@@ -55,8 +158,13 @@
                     </div>
                 </div>
                 
-                <div id="bracketSeciton"></div>
-                <div id="scheduleSection"></div>
+                <div id="bracketSeciton toggleSelection">
+
+                </div>
+
+                <div id="scheduleSection">
+
+                </div>
             </div>
         </div>
     </div>

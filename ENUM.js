@@ -45,6 +45,9 @@ var e = {
         IDENTITY:"identity",
         DEFAULT:"default",
         MULTY_SELECT_START:"multySelectStart",
+        ASSOCIATED_FORMS:"associatedFroms",
+        NAVIGATOR:"navigator",
+        PARENT_OBJECT:"parentObject"
         
         
 

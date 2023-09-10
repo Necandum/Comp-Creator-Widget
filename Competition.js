@@ -8,8 +8,7 @@ var Competition = (function () {
         let myId = ++id;
         let settings = new Map([])
         let phases = [];
-        let associatedDivFlesh;
-        // this._childCounter = new Map();
+        allCompetitions.push(this);
         this._terminalDistance = new Map();
         this._stageRecorder = new Map();
         this._pureStages = new Map();
@@ -18,8 +17,10 @@ var Competition = (function () {
         defineGetter({ obj: this, name: "currentSettings", func: () => mapToObjectArray(settings, "setting", "value") });
         defineGetter({ obj: this, name: "allPhasesArray", func: () => Array.from(phases) });
         defineGetter({ obj: this, name: "allGamesArray", func: () => this.allPhasesArray.reduce((acc,cv)=>{acc.push(...cv.allGamesInPhase);return acc;},[]) });
-        defineGetter({ obj: this, name: "flesh", func: () => associatedDivFlesh });
-        defineSetter({ obj: this, name: "flesh", func: (mainDiv) => associatedDivFlesh=mainDiv });
+       
+        this.updateSettings = function(newSettings){
+            if(newSettings.name) name = newSettings.name
+        }
         this.newPhase = function (phaseName,phaseType) {
             let newPhase = new Phase({ name: phaseName, parent: this, phaseType });
             phases.push(newPhase)
@@ -44,28 +45,7 @@ var Competition = (function () {
             })
             return largest;
         }
-        // this.refreshChildCounter = function(){
-        //     console.time("counterChild")
-        //     let games = this.allGamesArray;
-        //     this._childCounter = new Map();
-        //     for(let i = games.length-1;i>=0;i--){
-        //         this._countChildren(games[i]);
-        //     }
-        //     console.timeEnd("counterChild")
-        //     return this._childCounter
-        // }
-        // this._countChildren=function(unit){   
-        //     this._childCounter.set(unit,new Set());
-        //     for(const outLink of unit.outgoingLinks){
-        //         let childUnit = outLink.target
-        //         if(!this._childCounter.has(childUnit)) this._countChildren(childUnit);
-        //         this._childCounter.set(unit,new Set([...this._childCounter.get(unit),childUnit,...this._childCounter.get(childUnit)]));
-        //     }
-        //     if(unit instanceof Game){
-        //     let phase = unit.phase;
-        //     if(!this._childCounter.has(phase)) this._countChildren(phase);
-        //         this._childCounter.set(unit,new Set([...this._childCounter.get(unit),...this._childCounter.get(phase)]));}
-        // }
+   
         this.refreshTerminalDistance = function(){
             console.time("Terminal Distance")
             let games = this.allGamesArray;

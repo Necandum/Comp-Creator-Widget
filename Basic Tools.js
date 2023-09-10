@@ -3,7 +3,7 @@ function getE(queryString){
     return document.querySelector(queryString);
 }
 function Break(msg,variablesObj){
-    console.log("At time of error:",variablesObj);
+    console.log("At time of error:",variablesObj,{msg});
     throw new Error(msg)
 }
 
@@ -13,18 +13,34 @@ function Alert(msg,variableObj,trace=true){
    console.trace();
    return null
 }
-
+function IgnoreError(msg,err){
+    console.log(`Ignoring error:${msg}`,{error:{err}});
+}
 function UserError(msg,variableObj){
-    console.log("At time of user error:",variableObj);
+    console.log("At time of user error:",variableObj,{msg:{msg}});
     throw new Error(msg)
 }
 function parseHTML(string) {
+    // string = string.replace(/\n/g, '');
+    string = string.replace(/(?<=>)(?<a>[^<]*?)\s*/gmi,"");
     const template = document.createElement('template');
-    string = string.replace(/\n/g, '');
     template.innerHTML = string.trim();
     return template.content;
 }
-
+function forceCSSReflow(){
+   void document.body.offsetHeight;
+}
+function isSpaceBar(event){
+    let clickEventTriggeredBySpaceBarProbably = false;
+    if( event.offsetX===0 &&
+        event.offsetY===0 &&
+        event.pageX===0 &&
+        event.pageY===0 &&
+        event.movementX===0 &&
+        event.movementY===0 &&
+        event.button===0) clickEventTriggeredBySpaceBarProbably = true;
+        return clickEventTriggeredBySpaceBarProbably;
+}
 function getDayName(day) {
     const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     

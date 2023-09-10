@@ -1,0 +1,37 @@
+.competitorTab.toggleSelection{
+    display: flex;
+}
+
+.competitorTab>nav{
+    flex-grow: 4;
+    flex-basis: 0;
+}
+.competitorTab>div{
+    flex-basis: 100px;
+    flex-grow:1;
+    display: flex;
+    justify-content: center;
+    margin-right:0.8em;
+}
+.competitorTab>div>div{
+    width:max-content;
+    display:flex;
+    flex-direction: column;
+}
+
+.competitorTab h1{
+    font-size: 1.1em;
+}
+.competitorTab h1>span{
+    font-size: 0.8em;
+}
+
+#competitorSectionDisplayArea form{
+    border: 1px solid black;
+    margin: 0.8em 0.2em 0.8em 0.1em;
+}
+
+.competitorTab .inputContainer input{
+    float:right;
+    margin-left:0.3em;
+  }

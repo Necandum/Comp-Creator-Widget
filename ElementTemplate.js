@@ -1,6 +1,6 @@
 var ElementTemplate = (function () {
     let id=0;
-    function ElementTemplate({ htmlInsert,addFunctions,addDataStore,addEvents = [], addDataset = [], addClasses = [], addTemplates = [], label, addAsElder, onCreationCode, onCompletionCode }) {
+    function ElementTemplate({ htmlInsert,addFunctions,addDataStore,addAttributes=[],addEvents = [], addDataset = [], addClasses = [], addTemplates = [], label, addAsElder, onCreationCode, onCompletionCode }) {
 
         this.__peek = arguments[0];
         
@@ -56,7 +56,15 @@ var ElementTemplate = (function () {
                 if(!Array.isArray(addDataStore)) addDataStore = [addDataStore];
                 if(!Array.isArray(addDataStore[0])) addDataStore = [addDataStore];
                 for(const [newDataStoreName,newDataStoreValue] of addDataStore){
-                    localData.set(newDataStoreName,newDataStoreValue);
+                    localData.set(newDataStoreName,(newDataStoreValue instanceof Function) ? new newDataStoreValue(): newDataStoreValue);
+                }
+            }
+            addAttributes:{
+                if(!addAttributes || addAttributes.length===0) break addAttributes;
+                if(!Array.isArray(addAttributes)) addAttributes = [addAttributes];
+                if(!Array.isArray(addAttributes[0])) addAttributes = [addAttributes];
+                for(const [attribute,value] of addAttributes){
+                    mainDiv.setAttribute(attribute,value);
                 }
             }
 
@@ -103,7 +111,8 @@ var ElementTemplate = (function () {
                     const queryResult = mainDiv.querySelectorAll(newEvent.queryselection);
                     elements = (queryResult.length>0) ? Array.from(queryResult)
                                                       : (newEvent.selfBackUp) ? [mainDiv]
-                                                                              : Alert("Failed to find elements by query selection", { newEvent, addEvents, mainDiv, htmlInsert })
+                                                                              : (newEvent.optional) ? []
+                                                                                                    : Alert("Failed to find elements by query selection", { newEvent, addEvents, mainDiv, htmlInsert });
                 }
                 for (const trigger of newEvent.triggers) {
                     for(const element of elements){

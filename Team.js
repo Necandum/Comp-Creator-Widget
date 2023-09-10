@@ -3,7 +3,7 @@ var Team = (function () {
     let allTeams = new Map();
     defineGetter({ obj: Team, name: "allTeams", func: () => new Map(allTeams.entries())});
 
-    function Team(name = `Unnamed ${id + 1}`) {
+    function Team({name = `Unnamed ${id + 1}`}) {
         if (allTeams.has(name)) throw new Error('Team name already exists');
         let myId = ++id;
         let teamPlayers = new Map();
@@ -19,18 +19,25 @@ var Team = (function () {
         defineGetter({ obj: this, name: "divisions", func: () => new Set(divisions)});
 
         this.deleteTeam = function(){
-            allTeams.delete(this.name);
-        }
-        this.changeDetail = function changeDetail(detail, newValue) {
-            switch (detail) {
-                case e.NAME:
-                    if (allTeams.has(name)) throw new Error('Team name already exists');
-                    allTeams.delete(name);
-                    allTeams.set(newValue,this);
-                    name = newValue;
-                    CodeObserver.Execution({mark:Team,currentFunction:changeDetail,currentObject:this});
-                    break; 
+            let players = teamPlayers.keys();
+
+            for(const player of players){
+                this.removePlayer(player);
             }
+            for(const division of divisions){
+                division.remove(this);
+            }
+            allTeams.delete(this.name);
+            name="Deleted";
+        }
+        this.updateSettings = function (newSettings) {
+                if(newSettings.name!==undefined){
+                    if (allTeams.has(newSettings.name)) throw new Error('Team name already exists');
+                    allTeams.delete(name);
+                    name = newSettings.name;
+                    allTeams.set(name,this);
+                    CodeObserver.Execution({mark:Team,currentFunction:this.updateSettings,currentObject:this});
+                }
         }
         this.addToDivision=function(division){
             divisions.add(division);
@@ -40,6 +47,10 @@ var Team = (function () {
         }
         this.addPlayer = function (player,jerseyNumber) {
             if(!(player instanceof Player)) throw new Error('Not a Player');
+            if(!jerseyNumber) {
+                jerseyNumber=1;
+                teamJerseyNumbers.forEach((v,k,map)=>{if(map.has(jerseyNumber)) jerseyNumber++});
+            }
             if(teamJerseyNumbers.has(jerseyNumber)) throw new Error ("Jersey Number Taken")
             if(teamPlayers.has(player)) throw new Error("Team already has player")
 
@@ -47,7 +58,7 @@ var Team = (function () {
             teamJerseyNumbers.set(jerseyNumber,player);
             player.addTeam(this);
 
-            return this
+            return true
          }
 
         this.removePlayer = function (player) {

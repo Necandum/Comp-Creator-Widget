@@ -3,19 +3,37 @@ function ExclusiveLongClickTimer(htmlElement,callBackArray=[]){ //callBackArray:
     let callBackMap = new TimeMap();
     callBackArray.forEach((x)=>callBackMap.set(x.callBack,x.timing))
 
-    htmlElement.addEventListener("pointerdown",(ev)=>{
+    function startActivationFunction(ev){
         if(ev.pointerType==="mouse" && ev.button!==0) return
         startTime = Math.round(performance.now());
         endTime = null;
-        htmlElement.setPointerCapture(ev.pointerId)
-    });
+    }
 
-
-    htmlElement.addEventListener("pointerup",(ev)=>{
+    function stopActivationFunction(ev){
         if(ev.pointerType==="mouse" && ev.button!==0) return
         endTime = Math.round(performance.now());
-        htmlElement.releasePointerCapture(ev.pointerId);
         let relevantCallBacks = callBackMap.findOverlap(endTime-startTime).items;
         relevantCallBacks.forEach((callBack)=>callBack(htmlElement,ev,endTime-startTime))
+    }
+
+    htmlElement.addEventListener("pointerdown",(ev)=>{
+        if(!ev.target.dataset.passThrough && ev.target !== ev.currentTarget) return;
+        htmlElement.setPointerCapture(ev.pointerId)
+        startActivationFunction(ev);
+    });
+    
+    htmlElement.addEventListener("keydown",(ev)=>{
+        if(!ev.target.dataset.passThrough && ev.target !== ev.currentTarget) return;
+        if(ev.code==='Space' && ev.repeat===false) startActivationFunction(ev);
+    });
+    
+    htmlElement.addEventListener("pointerup",(ev)=>{
+        if(!ev.target.dataset.passThrough && ev.target !== ev.currentTarget) return;
+        htmlElement.releasePointerCapture(ev.pointerId);
+        stopActivationFunction(ev);
+    });
+    htmlElement.addEventListener("keyup",(ev)=>{
+        if(!ev.target.dataset.passThrough && ev.target !== ev.currentTarget) return;
+        if(ev.code==='Space') stopActivationFunction(ev);
     });
 }

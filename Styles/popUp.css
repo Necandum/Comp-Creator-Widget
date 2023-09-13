@@ -1,0 +1,19 @@
+div.popUpBase.toggleSelection{
+    display:flex;
+    justify-content: center;
+    align-items:center;
+    width:100%;
+    height:100%;
+    position:fixed;
+    top:0;
+    left:0;
+    background-color: rgba(130, 123, 122, 0.8);
+    z-index:100;
+    overflow: hidden;
+}
+
+div.popUpBase menu{
+    min-width:20%;
+    min-height:10%;
+    background-color: white;
+}

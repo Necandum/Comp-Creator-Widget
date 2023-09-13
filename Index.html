@@ -9,40 +9,44 @@
     <link rel="stylesheet" href="Styles/Menus.css">
     <link rel="stylesheet" href="Styles/Competitor.css">
     <link rel="stylesheet" href="Styles/Navigator.css">
+    <link rel="stylesheet" href="Styles/popUp.css">
     <title>Document</title>
 </head>
 <body>
     <div id="widgetMainDiv">
-        <div id="topMenuContainer">
-            <nav id="configurationMenuContainer">
-                <ul id="configurationMenu">
-                    <li > Competitor Set-up</li>
-                    <li class="toggleSelection"> Bracket Creation</li>
-                    <li> Scheduling</li>
-                </ul>
-            </nav>
-            <section id="sectionMenus">
-                <nav id="competitorSectionMenuContainer" class="hiddenByDefault ">
-                    <ul id="competitorSectionMenu">
-                        <li><div><div>  </div> </div></li>
-                        <li><div><div> Divisions </div> </div></li>
-                        <li><div><div> Teams  </div></div></li>
-                        <li><div><div> Players  </div></div></li>
-                        <li class="toggleSelection"><div><div> Combined  </div></div></li>
+            <div id="topMenuContainer">
+                <nav id="configurationMenuContainer">
+                    <ul id="configurationMenu">
+                        <li > Competitor Set-up</li>
+                        <li class="toggleSelection"> Bracket Creation</li>
+                        <li> Scheduling</li>
                     </ul>
-                </nav>  
-                <menu id="bracketSectionMenuContainer" class="hiddenByDefault toggleSelection">
-                    <li>
-                        <form data-controlled-object-constructor="Competition">
-                            <div class="inputContainer" data-object-field="name">
-                                <label>Competition Name: <input type="text" /><button type='button'> Update</button></label>
-                                
-                            </div>
-                        </form>
-                    </li>
-                </menu>
-            </section>    
-        </div>
+                </nav>
+                <section id="sectionMenus">
+                    <nav id="competitorSectionMenuContainer" class="hiddenByDefault ">
+                        <ul id="competitorSectionMenu">
+                            <li><div><div>  </div> </div></li>
+                            <li><div><div> Divisions </div> </div></li>
+                            <li><div><div> Teams  </div></div></li>
+                            <li><div><div> Players  </div></div></li>
+                            <li class="toggleSelection"><div><div> Combined  </div></div></li>
+                        </ul>
+                    </nav>
+                    <menu id="bracketSectionMenuContainer" class="hiddenByDefault toggleSelection">
+                        <li>
+                            <form data-controlled-object-constructor="Competition">
+                                <div class="inputContainer" data-object-field="name">
+                                    <label>Competition Name: <input type="text" /><button type='button'> Update</button></label>
+            
+                                </div>
+                            </form>
+                        </li>
+                        <li>
+                            <button type='button' data-button-function="createPhase"> Create Phase</button>
+                        </li>
+                    </menu>
+                </section>
+            </div>
             
         <div id="displayArea">
             <div id="configurationSectionContainer">
@@ -168,31 +172,27 @@
             </div>
         </div>
     </div>
-
-   
-
     
-</body>
-<!-- Building blocks, nil dependancies -->
-<script src="Basic Tools.js"></script>
-<script src="ENUM.js"></script>
-<script src="TimeMap.js"></script>
-<script src="ElementTemplate.js"></script>
-<!-- Building structures, some dependancies -->
-<script src="CodeObserver.js"></script>
-<script src="EventHandling.js"></script>
-<script src="Verification.js"></script>
-<script src="Registry.js"></script>
-<script src="Search.js"></script>
-<!-- Agents -->
-<script src="Player.js"></script>
-<script src="Team.js"></script>
-<script src="Division.js"></script>
-<script src="Competition.js"></script>
-<script src="Phase.js"></script>
-<script src="Block.js"></script>
-<script src="Game.js"></script>
-<script src="Link.js"></script>
+    <!-- Building blocks, nil dependancies -->
+    <script src="Basic Tools.js"></script>
+    <script src="ENUM.js"></script>
+    <script src="TimeMap.js"></script>
+    <script src="ElementTemplate.js"></script>
+    <!-- Building structures, some dependancies -->
+    <script src="CodeObserver.js"></script>
+    <script src="EventHandling.js"></script>
+    <script src="Verification.js"></script>
+    <script src="Registry.js"></script>
+    <script src="Search.js"></script>
+    <!-- Agents -->
+    <script src="Player.js"></script>
+    <script src="Team.js"></script>
+    <script src="Division.js"></script>
+    <script src="Competition.js"></script>
+    <script src="Phase.js"></script>
+    <script src="Block.js"></script>
+    <script src="Game.js"></script>
+    <script src="Link.js"></script>
 <!-- Outcome producers -->
 <script src="Scheduler.js"></script>
 <script src="SupportScheduler.js"></script>
@@ -200,6 +200,7 @@
 <script src="UIManager.js"></script>
 <!-- Set-up code necessary for things to run -->
 
+</body>
 
 
 <!-- Display elements on page  -->

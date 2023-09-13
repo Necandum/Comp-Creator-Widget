@@ -4,6 +4,7 @@
 
   body {
     font-family: Arial, Helvetica, sans-serif;
+    background-color: var(--main-content-color);
   }
 
 nav ul {
@@ -67,4 +68,8 @@ body{
   position: absolute;
   opacity:0%;
   top:calc( (1lh - 1em) / 3.1);
+}
+
+.noscroll{
+  overflow: hidden;
 }

@@ -3,6 +3,7 @@ var Competition = (function () {
     let id = 0;
     let allCompetitions = [];
     defineGetter({ obj: Competition, name: "allCompetitionsArray", func: () => Array.from(allCompetitions) });
+    defineGetter({ obj: Competition, name: "current", func: () => allCompetitions[0]});
 
     function Competition(name) {
         let myId = ++id;
@@ -121,7 +122,7 @@ var Competition = (function () {
     return Competition
 })()
 
-
+new Competition("New Competition");
 /**
      * @param {Game|Phase} startingUnit 
      * @returns {{similarLinks:Set,registry:Map}}

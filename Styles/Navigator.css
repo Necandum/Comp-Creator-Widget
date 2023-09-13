@@ -30,7 +30,7 @@
 
 .navigationPanel>*{
     border: 1px solid black;
-    margin:3px;
+    margin:4px 3px;
     position:relative;
     width:0px;
     flex-grow:1;
@@ -38,7 +38,8 @@
 }
 
 .navigationContainer>.navigationPanel>*{
-    border-width:2px
+    border-width:2px;
+    margin:3px;
 }
 
 .navigationControlPanel{

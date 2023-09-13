@@ -18,7 +18,6 @@ var Phase = (function () {
         let validity = new ValidityTracker(true);
         let ancestralLinksRegistrar = new AncestorRegistry(this,{selectedRegistrar:UniqueSourceRankRegistry});
         let thisPhase = this;
-        let associatedDivFlesh;
         phaseType = (phaseType===e.ROUND_ROBIN || phaseType===e.TOURNAMENT) ? phaseType: e.ROUND_ROBIN;
         name = (name) ? name : `Phase ${myId}`;
 
@@ -49,6 +48,7 @@ var Phase = (function () {
             blocks.push(newBlock);
             return newBlock;
         }
+        
         this.addLink = function addLink (link) {
             if (!(link instanceof Link)) throw new Error("Only Links can be so added.");
             if (link.target === this) Break("Links cannot target Phases directly",{link,this:this})

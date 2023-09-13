@@ -31,6 +31,8 @@ var e = {
         VERIFICATION:"verificationFunctions",
         VERIFICATION_FAILED:"verificationFailed",
         HARVEST_FUNCTIONS:"harvestFunctions",
+        HARVEST:"harvest",
+        RETRIEVE:"retrieve",
         HARVESTED_DATA:"harvestedData",
         DISPLAY_ALL:"displayAll",
         DISPLAY_NOT_PLAYERS:"displayNotPlayers",
@@ -47,7 +49,11 @@ var e = {
         MULTY_SELECT_START:"multySelectStart",
         ASSOCIATED_FORMS:"associatedFroms",
         NAVIGATOR:"navigator",
-        PARENT_OBJECT:"parentObject"
+        PARENT_OBJECT:"parentObject",
+        POP_UP:"popUp",
+        OBJECT_HANDLING:"objectHandlingFunctions",
+        OBJECT_FIELD:"objectField",
+        INPUT_CONTAINER_LIST:"inputContainerList",
         
         
 

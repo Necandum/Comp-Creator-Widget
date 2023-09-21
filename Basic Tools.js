@@ -2,6 +2,9 @@ var oLog={}
 function getE(queryString){
     return document.querySelector(queryString);
 }
+function newE(elementString){
+    return document.createElement(elementString);
+}
 function Break(msg,variablesObj){
     console.log("At time of error:",variablesObj,{msg});
     throw new Error(msg)
@@ -82,7 +85,9 @@ function mapToObjectArray(map,keyName="key",valueName="value"){
 function getElementIndex(element){
     return [].indexOf.call(element.parentNode.children,element);
   }
-
+function ensureArray(thing){
+    return (Array.isArray(thing)) ? thing:[thing];
+}
 function defineGetter({obj,name,func}){
     Object.defineProperty(obj,name,{
         configurable:true,
@@ -99,7 +104,7 @@ function defineSetter({obj,name,func}){
 }
 let SortFn={
     numDescending: (a,b)=>b-a,
-    numAscending: (a,b)=> a-b
+    numAscending: (a,b)=> a-b,
 };
 Object.freeze(SortFn);
 function defineComputedProperty({obj,name,getterFunc,setterFunc}){

@@ -1,17 +1,16 @@
 var Phase = (function () {
     let id = 0;
-
+    CodeObserver.register(Phase,e.CREATE);
     function Phase({ name, parent,phaseType }) {
         let myId = ++id;
         let settings = new Map([
-            [e.PRIORITY, 1], //int
-            [e.TOTAL_GAME_SECONDS, 1800], //int
-            [e.GAME_STAGES, [ //array of objects. playTime makes segment count as game time. player available marks whether player can be elsewhere. e.g halftime is not part of gametime, but players are not free. 
+            [e.PRIORITY.description, 1], //int
+            [e.GAME_STAGES.description, [ //array of objects. playTime makes segment count as game time. player available marks whether player can be elsewhere. e.g halftime is not part of gametime, but players are not free. 
                 { label: "Game", playTime: true, playerAvailable: false, endAtMiliSecond: 20*60*1000 },
                 { label: "Change-Over", playTime: false, playerAvailable: true, endAtMiliSecond: 30*60*1000 }
             ]],
-            [e.SUPPORT_TEAMS,new Set()],
-            [e.SUPPORT_SELECTION,e.PREDETERMINED] //e.PREDETERMINED or e.TOURNAMENT
+            [e.SUPPORT_TEAMS.description,new Set()],
+            [e.SUPPORT_SELECTION.description,e.PREDETERMINED] //e.PREDETERMINED or e.TOURNAMENT
         ])
         let blocks = [];
         let links = new Set();
@@ -114,26 +113,20 @@ var Phase = (function () {
                 CodeObserver.Execution({ mark: thisPhase, currentFunction: changeValidity, currentObject: thisPhase })
             }
 
-        this.changeDetail = function (detail, newValue) {
-            switch (detail) {
-                case e.NAME:
-                    name = newValue;
-                    break;
-            }
-        };
 
-        this.changeSetting = function (setting, newValue) {
-            switch (setting) {
-                case e.PRIORITY:
+        this.updateSettings = function (newSettings) {
+                if(newSettings["name"]){
+                    let newValue = newSettings["name"]
+                    name=newValue;
+                }
+                if(newSettings[e.PRIORITY.description]){
+                    let newValue = newSettings[e.PRIORITY.description]
                     if (typeof newValue !== "number") throw new Error("New value is not a number");
-                    settings.set(setting, newValue)
-                    break;
-                case e.TOTAL_GAME_SECONDS:
-                    if (typeof newValue !== "number") throw new Error("New value is not a number");
-                    settings.set(setting, newValue)
-                    break;
-                case e.GAME_STAGES:
-                    if (Array.isArray(newValue)) throw new Error("New value must be array");
+                    settings.set(e.PRIORITY.description, newValue)
+                }
+                if(newSettings[e.GAME_STAGES.description]){
+                    let newValue=newSettings[e.GAME_STAGES.description];
+                    if (!Array.isArray(newValue)) Break("New value must be an array",{newValue,newSettings})
                     newValue.forEach(element => {
                         if (typeof element !== "object") throw new Error("Must be an array of objects");
                         if (typeof element.label !== "string") throw new Error("Each object must contain a label which is a string");
@@ -141,24 +134,21 @@ var Phase = (function () {
                         if (typeof element.playerAvailable !== "boolean") throw new Error("Each object must contain a playerAvailable which is a boolean");
                         if (typeof element.endAtMiliSecond !== "number") throw new Error("Each object must contain a endAtMiliSecond which is a number");
                     });
-                    settings.set(setting, newValue);
-                    break;
-                case e.PHASE_TYPE:
-                    if (newValue !== e.ROUND_ROBIN && newValue !== e.TOURNAMENT) throw new Error("Must be a round robin or tournament")
-                    settings.set(setting, newValue);
-                    break;
-                case e.SUPPORT_TEAMS:
-                    settings.set(e.SUPPORT_TEAMS,newValue);
-                    break;
-                case e.SUPPORT_SELECTION:
-                    if(newValue!==e.PREDETERMINED && newValue!==e.TOURNAMENT) Break("Must either be e.PREDETERMINED or e.TOURNAMENT",{newValue})
-                    settings.set(e.SUPPORT_SELECTION,newValue);
-                    break;
-                default:
-                    throw new Error("Not an existing setting");
-            }
+                    settings.set(e.GAME_STAGES.description, newValue);
+                    }
+                if(newSettings[e.SUPPORT_TEAMS.description]){
+                    let newValue = newSettings[e.SUPPORT_TEAMS.description];
+                    if(!(newValue instanceof Set)) Break("Support Teams must be a set",{newSettings});
+                    settings.set(e.SUPPORT_TEAMS.description,newValue);
+                }
+                if(newSettings[e.SUPPORT_SELECTION.description]){
+                    let newValue=newSettings[e.SUPPORT_SELECTION.description];
+                    if(newValue!==e.PREDETERMINED && newValue!==e.TOURNAMENT) Break("Must either be e.PREDETERMINED or e.TOURNAMENT",{newValue});
+                    settings.set(e.SUPPORT_SELECTION.description,newValue);
+                    }
+            
         }
-        
+        CodeObserver.Creation({mark:Phase,newObject:this})
     }
 
     Phase.prototype = {

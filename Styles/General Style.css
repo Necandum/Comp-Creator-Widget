@@ -43,9 +43,6 @@ body{
   overflow: scroll;
 }
 
-.inputContainer input{
-  margin-left:0.3em;
-}
 
 .underlined{
   text-decoration: underline;

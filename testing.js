@@ -29,3 +29,9 @@ divaaa.add(t5)
 for(const nav of document.querySelectorAll("div.navigationContainer")){
     nav.func.refreshAll()
 }
+
+let comp = new Competition({name:"All sharks"});
+let phase = comp.newPhase("Yay");
+let block = phase.newBlock("Yo ^2");
+let game = block.newGame();
+block.newGame();

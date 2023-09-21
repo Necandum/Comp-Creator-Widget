@@ -19,6 +19,12 @@ var UIManager = (function () {
                 registry.delete(groupName);
                 return true;
             }
+            this.deleteMember = (groupName,member)=>{
+                let group = registry.get(groupName) ?? Break("Cannot delete from non-existant group", { groupName, member, registry });
+                member = group.aliasRegistry.get(member) ?? member;
+                group.forEach(classSet=>classSet.delete(member));
+                return true;
+            }
             this.addMember = (groupName=document, newMember, alias) => {
                 let group = registry.get(groupName) ?? Break("Cannot add to non-existant group", { groupName, newMember, registry });
                 if (alias) {
@@ -31,6 +37,10 @@ var UIManager = (function () {
                 if(!alias) Break("Must use alias to add family",{args:arguments});
                 let group = registry.get(groupName) ?? Break("Cannot add to non-existant group", { groupName, familyArray, registry });
                 familyArray = familyArray.filter(x=>(x instanceof Node));
+                if(group.aliasRegistry.has(alias)){
+                    this.expandFamily(groupName,alias,familyArray);
+                    return true;
+                }
                 group.aliasRegistry.set(alias,familyArray);
                 group.forEach(classSet=>classSet.add(familyArray));
                 return true
@@ -40,6 +50,7 @@ var UIManager = (function () {
                 let group = registry.get(groupName) ?? Break("Cannot add to non-existant group", { groupName, familyAlias, registry });
                 let familyArray = group.aliasRegistry.get(familyAlias);
                 if(!Array.isArray(newMembers)) newMembers=[newMembers];
+                newMembers = newMembers.filter(x=>(x instanceof Node));
                 familyArray.push(...newMembers);
                 return true;
             }
@@ -68,7 +79,7 @@ var UIManager = (function () {
                 }
                 return true;
             }
-            this.wipeClasses=(groupName,useClasses)=>{
+            this.wipeClasses=(groupName,useClasses=[])=>{
                 let group = registry.get(groupName) ?? Break("Cannot select member in non-existant group", { groupName, registry });
                 useClasses = new Set(useClasses);
                 if(useClasses.delete(e.DEFAULT)) useClasses.add(defaultClass);
@@ -135,6 +146,7 @@ var UIManager = (function () {
     const bracketSectionMenuContainer$ = getE("#bracketSectionMenuContainer");
     const competitorSectionMenu$ = getE("#competitorSectionMenu");
     const displayArea$ = getE('#displayArea');
+    const bracketSection$ = getE("#bracketSection");
     const teamForm$ = getE("#competitorTeamTab form");
     const teamNav$ = getE("#competitorTeamTab nav")
     const divisionForm$ = getE("#competitorDivisionTab form");
@@ -169,12 +181,15 @@ var UIManager = (function () {
     function stringNormalisation(anything) {
         return String(anything).trim().normalize();
     }
+    function integerNormalisation(anything) {
+        return Number.parseInt(anything,10);
+    }
 
     const HTMLTemplates = {};
     const EventTemplates = {};
     const ElementTemplates = {};
-    const Harvest = {//if insert data is included, its sown instead of harvesting
-        standardTextInput(inputContainer,{insertValue,reset=false}={}) {
+    const Harvest = {//Accepts (inputContainer,{insertValue,reset})
+        standardTextInput(inputContainer,{insertValue,reset=false}={}) { 
             let inputElement = inputContainer.firstElementChild.firstElementChild;
             if(reset === true) insertValue = "";
             if(insertValue!== undefined){
@@ -182,13 +197,55 @@ var UIManager = (function () {
             }
             return  stringNormalisation(inputElement.value);
         },
-    };
-    const Verify = {
-        notBlank(value) {
-            return /\S/.test(value);
+        smartStandardTextInput(resetValue) { 
+            function inner(inputContainer,{insertValue,reset=false}={}){
+                let inputElement = inputContainer.firstElementChild.firstElementChild;
+                if(reset === true) insertValue = resetValue;
+                if(insertValue!== undefined){
+                    inputElement.value= insertValue ?? resetValue;
+                }
+                return  stringNormalisation(inputElement.value);
+            }
+            return  inner;
+        },
+        smartStandardNumber(resetValue) { 
+            function inner(inputContainer,{insertValue,reset=false}={}){
+                let inputElement = inputContainer.firstElementChild.firstElementChild;
+                if(reset === true) insertValue = resetValue;
+                if(insertValue!== undefined){
+                    inputElement.value= insertValue ?? resetValue;
+                }
+                return  integerNormalisation(inputElement.value);
+            }
+            return  inner;
+        },
+        standardSingleCheckbox(inputContainer,{insertValue,reset=false}){
+            let inputElement = inputContainer.firstElementChild.firstElementChild;
+            if(reset) insertValue = false;
+            if(insertValue!==undefined) inputElement.checked=insertValue;
+            let value = inputElement.checked;
+            return value;
         }
     };
-    const Retreive = {
+    const Verify = { //func accepts (value), returns T/F
+        multiple(...verificationFunctions){
+            function inner(value){
+                for(const verifyFunc of verificationFunctions){
+                    if(!verifyFunc(value)) return false;
+                }
+                return true;
+            }
+            return inner;
+        },
+        notBlank(value) {
+            return /\S/.test(value);
+        },
+        positiveInt(value){
+            let numValue = Number(value);
+            return (Number.isInteger(numValue) && (numValue >= 0))
+        }
+    };
+    const Retreive = { //Accepts (controlloed object,property)
         directProperty(controlledObject,property){
             return controlledObject[property]
         },
@@ -198,8 +255,27 @@ var UIManager = (function () {
                 for(intermediateProperty of propertyLadder){
                     currentLocation = currentLocation[intermediateProperty]
                 }
-                currentLocation = currentLocation[property];
+               if(property!==undefined) currentLocation = currentLocation[property];
                 return currentLocation
+            }
+            return inner;
+        },
+        accessMap(propertyLadderToMap){
+            function inner(controlledObject,key){
+                let map = Retreive.deepProperty(propertyLadderToMap)(controlledObject);
+                return map.get(key);
+            }
+            return inner;
+        }
+    }
+    const Edit={ //Accepts (controlledobject,objectField,newValue)
+        newSettings(controlledObject,objectField,newValue){
+            controlledObject.updateSettings({[objectField]:newValue});
+        },
+        setMap(propertyLadderToMap){
+            function inner(controlledObject,objectField,newValue){
+                let map = Retreive.deepProperty(propertyLadderToMap)(controlledObject); 
+                map.set(objectField,newValue);
             }
             return inner;
         }
@@ -208,6 +284,40 @@ var UIManager = (function () {
         get verify() {
             return new CustomEvent("verify", { bubbles: true })
         },
+    }
+    HTMLTemplates.smartStandardText = function(label){
+        let html = parseHTML(`
+        <label>${label} <input type='text'/> </label>
+        `)
+        return html;
+    }
+    HTMLTemplates.smartStandardNumber = function(label){
+        let html = parseHTML(`
+        <label>${label} <input type='number' value='0'/> </label>
+        `)
+        return html;
+    }
+    HTMLTemplates.smartStandardSelect = function(label,optionArray){
+        let select$= newE("select");
+        for(const optionParameters of optionArray){
+            let option$=newE("option");
+            select$.append(option$);
+            if(optionParameters.value!==undefined) option$.value=optionParameters.value;
+            if(optionParameters.text!==undefined) option$.textContent=optionParameters.text;
+        }
+        let label$=newE("label");
+        label$.textContent=label;
+        label$.append(select$);
+        return label$;
+    }
+    HTMLTemplates.smartStandardSingleCheckbox = function(label){
+        let checkbox$= newE("input");
+        checkbox$.setAttribute("type","checkbox");
+       
+        let label$=newE("label");
+        label$.textContent=label;
+        label$.append(checkbox$);
+        return label$;
     }
     topMenu:{
          //Set-up selection links
@@ -234,9 +344,8 @@ var UIManager = (function () {
         ElementTemplates.popUpBase = new ElementTemplate({
             htmlInsert:function(mainDiv,options){
                 let html = parseHTML(`
-                <menu class='popUpWindox'>
+                <menu class='popUpWindow'>
                 <section class='popUpContentContainer'>
-                Hello
                 </section>
                 </menu>
                 `);
@@ -248,6 +357,7 @@ var UIManager = (function () {
             onCompletionCode:function(){
                 UniqueSelection.addGroup(e.POP_UP);
                 UniqueSelection.addMember(e.POP_UP,this);
+                document.body.append(this);
             }
         });
         EventTemplates.closePopUp = ElementTemplate.eventObjMaker({
@@ -274,6 +384,345 @@ var UIManager = (function () {
             }
         });
         
+    }
+    GenericForm:{
+        function harvest({insertValue,reset=false}={}){
+            return this.load(e.HARVEST)(this,{insertValue,reset});
+        }
+        function retrieve(){
+            return this.load(e.RETRIEVE)(this.elder['form'].load(e.CONTROLLED_OBJECT),this.load(e.OBJECT_FIELD))
+        }
+        function verify(value){
+            return this.load(e.VERIFICATION)(value);
+        }
+        function edit(newValue){
+            return this.load(e.EDIT)(this.elder['form'].load(e.CONTROLLED_OBJECT),this.load(e.OBJECT_FIELD),newValue);
+        }
+        ElementTemplates.inputContainer = new ElementTemplate({
+            addAsElder:"inputContainer",
+            addClasses:"inputContainer",
+            addFunctions:[harvest,retrieve,verify,edit],
+            addDataStore:[
+                [e.VERIFICATION,"assigned at runtime"],
+                [e.HARVEST,"assigned at runtime"],
+                [e.RETRIEVE,"assigned at runtime"],
+                [e.OBJECT_FIELD,"assigned at runtime"],
+            ],
+            onCreationCode:function(mainDiv,options){
+                const {
+                objectField,
+                verify,
+                harvest,
+                retrieve,
+                htmlContents}=options;
+
+                this.save(e.OBJECT_FIELD,objectField);
+                this.save(e.HARVEST,harvest);
+                this.save(e.VERIFICATION,verify);
+                this.save(e.RETRIEVE,retrieve);
+
+                this.init.htmlInsert(htmlContents);
+                this.dataset.objectField = objectField;
+            }
+        });
+
+        
+        function switchMode(newMode){
+            this.save(e.MODE,newMode);
+            UniqueSelection.select(this,newMode);
+        }
+        function harvestData(){
+            let harvestedData = new Map();
+            for(const inputContainer of this.load(e.INPUT_CONTAINER_LIST)){
+                harvestedData.set(inputContainer,inputContainer.func.harvest());
+            }
+            this.save(e.HARVESTED_DATA,harvestedData);
+            return harvestedData;
+        }
+        function verifyHarvestedData(){
+            let harvestedData = this.load(e.HARVESTED_DATA);
+            this.func.clearVerificationList();
+            for(const [inputContainer,value] of harvestedData){
+                if(!inputContainer.func.verify(value)) failedVerification(this,inputContainer);
+            }
+            return (this.load(e.VERIFICATION_FAILED).size===0)
+        }
+        function resetValues(toDefaultState){
+            let controlledObject = this.load(e.CONTROLLED_OBJECT);
+            for(const inputContainer of this.load(e.INPUT_CONTAINER_LIST)){
+                if(!toDefaultState && controlledObject){
+                   inputContainer.func.harvest({insertValue:inputContainer.func.retrieve()}) 
+                } else {
+                    inputContainer.func.harvest({reset:true}) 
+                }
+            }
+        }
+        function importObject(newControlledObject){
+            if(!(newControlledObject instanceof this.load(e.CONTROLLED_OBJECT_CONSTRUCTOR))) Break("Ineligible object passed for import",{newControlledObject,form:this});
+            this.save(e.CONTROLLED_OBJECT,newControlledObject);
+        }
+        function editingMode(newControlledObject){
+            if(newControlledObject) this.func.importObject(newControlledObject);
+            if(!this.load(e.CONTROLLED_OBJECT)) Break("Cannot engage editing mode without a controlledObject",{form:this});
+            this.func.switchMode(e.EDIT);
+            this.func.clearVerificationList();
+            this.func.resetValues();
+        }
+        function creationMode(){
+            this.func.switchMode(e.CREATE);
+            this.func.clearVerificationList();
+            this.func.resetValues(true);
+        }
+        function createObject(){
+            let harvestedData = this.func.harvestData();
+            if(this.func.verifyHarvestedData()){
+                let creationObject={};
+                for(const [inputContainer,data] of harvestedData){
+                    creationObject[inputContainer.load(e.OBJECT_FIELD)]=data;
+                }
+                return new this.load(e.CONTROLLED_OBJECT_CONSTRUCTOR)(creationObject);
+            }
+            return false;
+        }
+        function updateObject(){
+            let harvestedData = this.func.harvestData();
+            if(this.func.verifyHarvestedData() && this.load(e.CONTROLLED_OBJECT)){
+                for(const [inputContainer,newValue] of harvestedData){
+                    inputContainer.func.edit(newValue);
+                }
+                return true;
+            }
+            return false;
+        }
+        function clearVerificationList(){
+            UniqueSelection.wipeClasses(this.elder['form'],["failed"]);
+            this.load(e.VERIFICATION_FAILED).clear();
+        }
+        function failedVerification(form,inputContainer){
+            form.load(e.VERIFICATION_FAILED).add(inputContainer);
+            UniqueSelection.select(form.elder['form'],inputContainer,true,["failed"]);
+        }
+        function addInputContainer(...inputContainerOptionList){
+            for(const inputContainerOptions of inputContainerOptionList){
+               let [createdElement]= this.init.addTemplates([[ElementTemplates.inputContainer,{templateOptions:inputContainerOptions,parentElement:"section.inputContainers"}]]);
+               this.load(e.INPUT_CONTAINER_LIST).add(createdElement);
+               UniqueSelection.addMember(this.elder['form'],createdElement);  
+               createdElement.func.harvest({reset:true});
+            }
+            return this.func;
+        }
+        function addStackableInputContainer(inputContainerOptions){
+               let [createdElement]= this.init.addTemplates([[ElementTemplates.stackableInputContainer,{templateOptions:inputContainerOptions,parentElement:"section.inputContainers"}]]);
+               this.load(e.INPUT_CONTAINER_LIST).add(createdElement);
+               UniqueSelection.addMember(this.elder['form'],createdElement);  
+            return createdElement.func;
+        }
+        function removeInputContainer(inputContainer){
+            this.load(e.INPUT_CONTAINER_LIST).delete(inputContainer);
+            UniqueSelection.deleteMember(this.elder['form'],inputContainer);
+            if(inputContainer.load(e.INPUT_CONTAINER_LIST)){
+                for(const innerInputContainer of inputContainer.load(e.INPUT_CONTAINER_LIST)){
+                    inputContainer.func.removeInputContainer(innerInputContainer);
+                }
+            }
+            inputContainer.remove();
+        }
+        ElementTemplates.stackableInputContainer = new ElementTemplate({
+            addClasses:["inputContainer","stackableInputContainer"],
+            addFunctions:[harvest,retrieve,verify,edit,addInputContainer,addStackableInputContainer,clearVerificationList,removeInputContainer],
+            addDataStore:[
+                [e.VERIFICATION,"assigned at runtime"],
+                [e.HARVEST,"assigned at runtime"],
+                [e.RETRIEVE,"assigned at runtime"],
+                [e.OBJECT_FIELD,"assigned at runtime"],
+                [e.HARVESTED_DATA,"assigned at runtime"],
+                [e.INPUT_CONTAINER_LIST,Set],
+                [e.VERIFICATION_FAILED,Set],
+
+            ],
+            onCreationCode:function(mainDiv,options){
+                const {
+                objectField,
+                verify,
+                harvest,
+                retrieve,
+                htmlContents,
+                addAsElder}=options;
+
+                this.save(e.OBJECT_FIELD,objectField);
+                this.save(e.HARVEST,harvest ?? harvestData.bind(mainDiv));
+                this.save(e.VERIFICATION,verify ?? verifyHarvestedData.bind(mainDiv));
+                this.save(e.RETRIEVE,retrieve);
+
+                this.init.htmlInsert(htmlContents);
+                this.init.addAsElder(addAsElder);
+                this.dataset.objectField = objectField;
+            }
+        });
+        ElementTemplates.genericForm = new ElementTemplate({
+            mainElement:"form",
+            addAsElder:"form",
+            addFunctions:[harvestData,verifyHarvestedData,addInputContainer,addStackableInputContainer,switchMode,
+                clearVerificationList,resetValues,importObject,editingMode,creationMode,createObject,updateObject,removeInputContainer],
+            htmlInsert:function(mainForm,options){
+                let html = parseHTML(`
+                    <section class='inputContainers'>
+                    
+                    </section>
+                    <section class='formControls'>
+                    
+                    </section>
+                `)
+                return html;
+            },
+            addDataStore:[
+                [e.MODE, e.CREATE],
+                [e.CONTROLLED_OBJECT_CONSTRUCTOR, "defined at build"],
+                [e.CONTROLLED_OBJECT, null],
+                [e.VERIFICATION_FAILED, Set],
+                [e.HARVESTED_DATA, null],
+                [e.PARENT_OBJECT,null],
+                [e.INPUT_CONTAINER_LIST,Set]
+                ],
+                onCreationCode:function(mainForm,options){
+                    const{controlledObjectConstructor} = options;
+                    this.save(e.CONTROLLED_OBJECT_CONSTRUCTOR, controlledObjectConstructor); 
+                    UniqueSelection.addGroup(this,{alternateClasses:["failed"]});
+                    UniqueSelection.addFamily(this,[],e.CREATE);
+                    UniqueSelection.addFamily(this,[],e.EDIT);
+                },
+
+        });
+
+
+
+        EventTemplates.deleteTeamDisplayTag = ElementTemplate.eventObjMaker({
+            triggers:"click",
+            queryselection:"button[data-button-function='delete']",
+            func:function(ev){
+                let currentSelected = ev.target.elder['teamSelector'].load(e.CONTENTS);
+                let me = ev.target.elder['teamDisplayTag'].load(e.CONTROLLED_OBJECT);
+                currentSelected.delete(me);
+                ev.target.elder['teamSelector'].func.refreshDisplay();
+            }
+        });
+        
+        ElementTemplates.teamDisplayTag = new ElementTemplate({
+            htmlInsert:(mainDiv,options)=>parseHTML(`
+                <h3>${options.teamOrDiv.name}</h3><button type='button' data-button-function='delete'>X</button>
+            `),
+            addClasses:"teamDisplayTag",
+            addAsElder:"teamDisplayTag",
+            addEvents:[EventTemplates.deleteTeamDisplayTag],
+            addDataStore:[
+                [e.CONTROLLED_OBJECT,null]
+            ],
+            onCreationCode:function(mainDiv,options){
+                let {teamOrDiv} = options;
+                this.save(e.CONTROLLED_OBJECT,teamOrDiv);
+                if(teamOrDiv instanceof Division){
+                    let divTeams = Array.from(teamOrDiv.allTeams).sort((a,b)=>a.name.localeCompare(b.name));
+                    if(divTeams.length>0){
+                        let list$=newE("ul");
+                        for(const team of divTeams){
+                            let listEntry$ = newE("li");
+                            listEntry$.textContent=team.name;
+                            list$.append(listEntry$)
+                        }
+                        this.append(list$);
+                    }
+                }
+
+            }
+        });
+        function refreshTeamOptions(){
+            let select$= this.querySelector("select");
+            select$.replaceChildren();
+            let matchingMap = new Map();
+            let allDivisions$ = newE("optgroup");
+            allDivisions$.setAttribute("label","All Divisions")
+            let allTeams$ = newE("optgroup");
+            allTeams$.setAttribute("label","All Teams")
+            let allDivisions = Division.allDivisionsArray.sort((a,b)=>a.name.localeCompare(b.name));
+            let allTeams = Team.allTeamsArray.sort((a,b)=>a.name.localeCompare(b.name));
+            for(const div of allDivisions){
+                allDivisions$.append(newOption(div));
+            }
+            for(const team of allTeams){
+                allTeams$.append(newOption(team));
+            }
+            select$.append(allDivisions$);
+            select$.append(allTeams$);
+            select$.setAttribute("multiple",true);
+            function newOption(teamOrDiv){
+                let option$ = newE("option");
+                option$.textContent = teamOrDiv.name;
+                matchingMap.set(option$,teamOrDiv);
+                return option$;
+            }
+            this.save(e.OBJECT_HANDLING,matchingMap);
+        }
+        function refreshDisplay(){
+            let display$ = this.querySelector("div.teamDisplay");
+            display$.replaceChildren();
+            for(const teamOrDiv of this.load(e.CONTENTS)){
+                display$.append(ElementTemplates.teamDisplayTag.build(this,{teamOrDiv}));
+            }
+
+        }
+        function makeSelection(teamOrDivArray){
+            let currentlySelected = this.load(e.CONTENTS);
+            teamOrDivArray.forEach(x=>currentlySelected.add(x));
+            this.func.refreshDisplay();
+        }
+        function harvestTeamSelection({insertValue,reset=false}){
+
+            if(reset) insertValue = new Set();
+            if(insertValue!==undefined){
+                this.save(e.CONTENTS,insertValue);
+                this.func.refreshDisplay();
+                this.func.refreshTeamOptions();
+            }
+            let selectedSet = this.load(e.CONTENTS)
+            let finalSet = new Set();
+            for(const teamOrDiv of selectedSet){
+                if(teamOrDiv instanceof Team){
+                    finalSet.add(teamOrDiv)
+                }
+                if(teamOrDiv instanceof Division){
+                    teamOrDiv.allTeams.forEach(team=>finalSet.add(team));
+                }
+            }
+            return finalSet;
+        }
+        EventTemplates.selectTeamOrDivision = ElementTemplate.eventObjMaker({
+            triggers:"input",
+            queryselection:"select", //attached to selectelement
+            func:function(ev){
+                let selectedOptions = Array.from(this.selectedOptions);
+                let matchingMap = this.elder['teamSelector'].load(e.OBJECT_HANDLING);
+                let selectedTeamOrDivArray = selectedOptions.map((option)=>matchingMap.get(option))
+                this.elder['teamSelector'].func.makeSelection(selectedTeamOrDivArray);
+            },
+        });
+        ElementTemplates.displayTeamSelection = new ElementTemplate({
+            htmlInsert:parseHTML(`
+                <select></select>
+                <div class='teamDisplay'></div>
+            `),
+            addFunctions:[refreshTeamOptions,makeSelection,refreshDisplay,[harvestTeamSelection,"harvest"]],
+            addEvents:[EventTemplates.selectTeamOrDivision],
+            addAsElder:"teamSelector",
+            addClasses:"teamSelector",
+            addDataStore:[
+                [e.CONTENTS,Set],
+                [e.OBJECT_HANDLING,Map]
+            ],
+            onCompletionCode:function(mainDiv,options){
+                this.func.refreshTeamOptions();
+                oLog.teamSelect = this;
+            }
+        });
     }
     competitorsSection: {
         objectControl: {
@@ -352,7 +801,6 @@ var UIManager = (function () {
 
             //Import
             function importObject(importedObj){
-                console.log(importedObj)
                 let intendedConstructor = this.load(e.CONTROLLED_OBJECT_CONSTRUCTOR);
                 if(importedObj.constructor !== intendedConstructor) Break("Incorrect object attempetd to be passed to form for editing",{mainform:this,importedObj,intendedConstructor});
                 this.func.switchMode(e.EDIT,importedObj);
@@ -1197,115 +1645,521 @@ var UIManager = (function () {
     bracketSection:{
 
         menu:{
+            setUp:{
+                //Competition Name
+                let updateCompetitionNameForm$ = bracketSectionMenuContainer$.querySelector("form[data-controlled-object-constructor='Competition']")
+                ElementTemplates.objectController.build(null,{
+                    useAsMainDiv:updateCompetitionNameForm$,
+                    customButtonControls:true,
+                    verificationFunctions: new Map([
+                        ["name",Verify.notBlank],
+                    ]),
+                    dataHarvestFunctions: new Map([
+                        ["name",Harvest.standardTextInput],
+                    ])
+                })
+                let compCreateButton$= updateCompetitionNameForm$.querySelector("button");
+                
+                function createComp(){
+                    updateCompetitionNameForm$.func.objectCreation();
+                    updateCompetitionNameForm$.func.populateValues();
+                }
+                compCreateButton$.addEventListener("click",createComp);
+
+                function compCreationHandler(observer,observation){
+                    if(observer!==CodeObserver.Creation) return false;
+                    convertCreateButtonToUpdate();
+                }
+                CodeObserver.addHandler(Competition,compCreationHandler);
+
+                function convertCreateButtonToUpdate(){
+                    if(compCreateButton$.dataset.buttonFunction!=="create") return false;
+                    compCreateButton$.removeEventListener("click",createComp);
+                    CodeObserver.removeHandler(Competition,compCreationHandler)
+                    updateCompetitionNameForm$.func.importObject(Competition.current);
+                    compCreateButton$.dataset.buttonFunction = 'update';
+                    compCreateButton$.textContent = 'Update';
+                    compCreateButton$.addEventListener("click",(ev)=>{
+                        updateCompetitionNameForm$.func.updateControlledObject()
+                    });
+                }
+               
+                //Phase Editor
                 phaseEditor:{
-                    function harvest({insertValue,reset=false}={}){
-                        return this.load(e.HARVEST)(this,{insertValue,reset});
-                    }
-                    function retrieve(){
-                        return this.load(e.RETRIEVE)(this.elder['form'].load(e.CONTROLLED_OBJECT),this.load(e.OBJECT_FIELD))
-                    }
-                    function verify(){
-                        let value = this.func.harvest();
-                        return this.load(e.VERIFICATION)(value);
-                    }
-                    ElementTemplates.inputContainer = new ElementTemplate({
-                        addAsElder:"inputContainer",
-                        addClasses:"inputContainer",
-                        addDataStore:[
-                            [e.VERIFICATION,"assigned at runtime"],
-                            [e.HARVEST,"assigned at runtime"],
-                            [e.RETRIEVE,"assigned at runtime"],
-                            [e.OBJECT_FIELD,"assigned at runtime"],
-                        ],
-                        onCreationCode:function(mainDiv,options){
-                            const {objectField,
-                            verify,
-                            harvest,
-                            retrieve,
-                            htmlContents}=options;
-                            this.save(e.OBJECT_FIELD,objectField);
-                            this.save(e.HARVEST,harvest);
-                            this.save(e.VERIFICATION,verify);
-                            this.save(e.RETRIEVE,retrieve);
+                    gameStageInputMaker = function(form){
+                        let baseStackableInput$ = ElementTemplates.stackableInputContainer.build(form,{
+                            objectField:"gameStages",
+                            addAsElder:"gamestages",
+                            htmlContents:parseHTML(`
+                            <section class='inputContainers'>
+                            </section>
+                            <button type='button' data-button-function='newLineInput'> + </button>
+                            `),
+                            retrieve:Retreive.accessMap("currentSettings"),
+                            harvest:(inputContainer,{insertValue,reset})=>{
+                                if(reset){
+                                    insertValue = [ 
+                                    { label: "Game", playTime: true, playerAvailable: false, endAtMiliSecond: 20*60*1000 },
+                                    { label: "Change-Over", playTime: false, playerAvailable: true, endAtMiliSecond: 30*60*1000 }
+                                    ]
+                                }
+                                if(insertValue!==undefined){
+                                    let newLineSection = inputContainer.querySelector("section.inputContainers");
+                                    for(const innerInput of inputContainer.load(e.INPUT_CONTAINER_LIST)){
+                                        inputContainer.func.removeInputContainer(innerInput);
+                                    }
+                                    let cumultativeTime=0;
+                                    for(const lineData of insertValue){
+                                        let lineLength = lineData.endAtMiliSecond - cumultativeTime;
+                                        cumultativeTime=lineData.endAtMiliSecond;
+                                        lineData.lengthMin = Math.floor(lineLength/60000);
+                                        lineData.lengthSec = Math.floor((lineLength%60000)/1000);
+                                        gameStageLineInputAdder(inputContainer,newLineSection).func.harvest({insertValue:lineData});
+                                    }
+                                }
+                                let harvestedData= new Map();
+                                let returnData = [];
+                                let cumultativeTime=0;
+                                for(const innerInput of inputContainer.load(e.INPUT_CONTAINER_LIST)){
+                                let innerData= innerInput.func.harvest();
+                                let innerDataLength = innerData.lengthMin*60000+innerData.lengthSec*1000;
+                                innerData.endAtMiliSecond = cumultativeTime + innerDataLength;
+                                cumultativeTime= cumultativeTime + innerDataLength;
+                                harvestedData.set(innerInput,innerData);
+                                returnData.push(innerData);
+                                }
+                                inputContainer.save(e.HARVESTED_DATA,harvestedData);
+                                return returnData;
+                            },
+                            edit:Edit.newSettings
+                        });
+                        form.load(e.INPUT_CONTAINER_LIST).add(baseStackableInput$);
+                        let newLineSection$ = baseStackableInput$.querySelector("section.inputContainers");
+                        gameStageLineInputAdder(baseStackableInput$,newLineSection$);
 
-                            this.init.htmlInsert(htmlContents);
-                            this.dataset.objectField = objectField;
+                        baseStackableInput$.querySelector("button[data-button-function='newLineInput']").addEventListener("click",(ev)=>{
+                            gameStageLineInputAdder(baseStackableInput$,newLineSection$);
+                        });
 
-                            this.elder['form'].load(e.INPUT_CONTAINER_LIST).add(this);
+                        return baseStackableInput$;                    
+                    }
+                    function gameStageLineInputAdder(container,destination){
+                        let lineInput$ = ElementTemplates.stackableInputContainer.build(container,{
+                            addAsElder:"lineinput",
+                            htmlContents:parseHTML(`
+                            <section class='inputContainers'>
+                            </section>
+                            <button type='button' data-button-function='deleteInputLine'> x </button>
+                            `),
+                            harvest:(inputContainer,{insertValue})=>{
+                                
+                                let harvestedData= new Map();
+                                let returnData ={};
+                                
+                                    for(const innerInput of inputContainer.load(e.INPUT_CONTAINER_LIST)){
+                                        let objectField = innerInput.load(e.OBJECT_FIELD);
+                                        let innerData = innerInput.func.harvest({insertValue:insertValue?.[objectField]});
+                                        harvestedData.set(innerInput,innerData);
+                                        returnData[objectField]=innerData;
+                                    }
+                                    inputContainer.save(e.HARVESTED_DATA,harvestedData);
+                                
+                                return returnData;
+                            },
+                        });
+                        container.load(e.INPUT_CONTAINER_LIST).add(lineInput$);
+                        lineInput$.func.addInputContainer(
+                            {
+                                objectField:"label",
+                                htmlContents:HTMLTemplates.smartStandardText("Name"),
+                                verify:Verify.notBlank,
+                                harvest:Harvest.smartStandardTextInput("Stage Name"),
+                            },
+                            {
+                                objectField:"playTime",
+                                htmlContents:HTMLTemplates.smartStandardSingleCheckbox("Game Time"),
+                                verify:(value)=>(value===true||value===false),
+                                harvest:Harvest.standardSingleCheckbox,
+                            },
+                            {
+                                objectField:"playerAvailable",
+                                htmlContents:HTMLTemplates.smartStandardSingleCheckbox("Players Available"),
+                                verify:(value)=>(value===true||value===false),
+                                harvest:Harvest.standardSingleCheckbox,
+                            },
+                            {
+                                objectField:"lengthMin",
+                                htmlContents:HTMLTemplates.smartStandardNumber("Minutes"),
+                                verify:Verify.notBlank,
+                                harvest:Harvest.smartStandardNumber("0"),
+                            },
+                            {
+                                objectField:"lengthSec",
+                                htmlContents:HTMLTemplates.smartStandardNumber("Seconds"),
+                                verify:Verify.notBlank,
+                                harvest:Harvest.smartStandardNumber("0"),
+                            }
+                        )
+
+                        destination.append(lineInput$);
+                        lineInput$.querySelector("button[data-button-function='deleteInputLine']").addEventListener("click",(ev)=>{
+                            container.func.removeInputContainer(lineInput$);
+                        })
+                        return lineInput$;
+                    }
+                    //Make pop-up
+                    const phasePopUp$ = ElementTemplates.popUpBase.build(null);
+                    const [phaseEditor$] = phasePopUp$.init.addTemplates([[ElementTemplates.genericForm,{parentElement:"section",templateOptions:{controlledObjectConstructor:Phase}}]])
+                    phaseEditor$.func.addInputContainer(
+                    {
+                        objectField:"name",
+                        htmlContents:HTMLTemplates.smartStandardText("Name"),
+                        verify:Verify.notBlank,
+                        retrieve:Retreive.directProperty,
+                        harvest:Harvest.smartStandardTextInput("New Phase"),
+                        edit:Edit.newSettings
+                    },
+                    {
+                        objectField:"priority",
+                        htmlContents:HTMLTemplates.smartStandardNumber("Priority"),
+                        verify:Verify.multiple(Verify.notBlank,Verify.positiveInt),
+                        retrieve:Retreive.directProperty,
+                        harvest:Harvest.smartStandardNumber(0),
+                        edit:Edit.newSettings
+                    },
+                    {
+                        objectField:"supportSelection",
+                        htmlContents:HTMLTemplates.smartStandardSelect("Duty Assignment Method",[{text:"Pre-determined",value:"0"},{text:"Outcome Driven",value:"1"}]),
+                        verify:(value)=>Boolean(value===e.PREDETERMINED ||value=== e.TOURNAMENT),
+                        retrieve:Retreive.accessMap(["currentSettings"]),
+                        harvest:(inputContainer,{insertValue,reset=false}={})=>{
+                            let selectElement$ = inputContainer.firstElementChild.firstElementChild;
+                            let currentValue=selectElement$.selectedOptions[0].value;
+                            let interpretedValue = (currentValue==="0") ? e.PREDETERMINED
+                                                                        :(currentValue==="1") ? e.TOURNAMENT
+                                                                                            :null;
+                            if(reset) insertValue = e.PREDETERMINED;
+                            if(insertValue!==undefined){
+                                let neededValue = (insertValue===e.TOURNAMENT) ? "1":"0";
+                                selectElement$.querySelector(`option[value='${neededValue}'`).selected=true;
+                            } 
+                            return interpretedValue;
+                        },
+                        edit:Edit.newSettings
+                    },
+                    {
+                        objectField:"phaseType",
+                        htmlContents:HTMLTemplates.smartStandardSelect("Phase Type",[{text:"Round Robin",value:"0"},{text:"Tournament",value:"1"}]),
+                        verify:(value)=>Boolean(value===e.ROUND_ROBIN ||value=== e.TOURNAMENT),
+                        retrieve:Retreive.directProperty,
+                        harvest:(inputContainer)=>{
+                            let selectElement$ = inputContainer.firstElementChild.firstElementChild;
+                            let currentValue=selectElement$.selectedOptions[0].value;
+                            let interpretedValue = null;
+                            if(currentValue==="0") interpretedValue = e.ROUND_ROBIN;
+                            if(currentValue==="1") interpretedValue = e.TOURNAMENT;
+                                                                                            
+                            return interpretedValue;
+                        },
+                        edit:()=>false
+                    },
+                    {
+                        objectField:"supportTeams",
+                        htmlContents:ElementTemplates.displayTeamSelection.build,
+                        verify:(value)=>{
+                            if(!(value instanceof Set)) return false;
+                            let flag = true; 
+                            value.forEach(teamOrDiv=>{
+                                if(!(teamOrDiv instanceof Team)) flag=false;
+                            })
+                            return flag; 
+                        },
+                        retrieve:Retreive.accessMap(["currentSettings"]),
+                        harvest:(inputContainer,{insertValue,reset})=>inputContainer.firstElementChild.func.harvest({insertValue,reset}),
+                        edit:Edit.newSettings
+                    }
+                    )
+                    //Add in game stage editor
+                    phaseEditor$.querySelector("section.inputContainers").append(gameStageInputMaker(phaseEditor$));
+                    //Add in pop-up headings
+                    let createHeading = parseHTML(`<h1 class='hiddenByDefault'> Create New Phase</h1>`).querySelector("h1");
+                    let editHeading = parseHTML(`<h1 class='hiddenByDefault'> Edit Existing Phase</h1>`).querySelector("h1");
+                    phaseEditor$.prepend(createHeading,editHeading)
+                    UniqueSelection.expandFamily(phaseEditor$,e.CREATE,createHeading);
+                    UniqueSelection.expandFamily(phaseEditor$,e.EDIT,editHeading);
+                    //Add in form controls
+                    phaseEditor$.querySelector("section.formControls").append(HTMLTemplates.objectControllerFormControls(phaseEditor$));
+
+                    phaseEditor$.querySelector("button[data-form-button='create']").addEventListener("click",(ev)=>{
+                        let harvestedData = phaseEditor$.func.harvestData();
+                        if(phaseEditor$.func.verifyHarvestedData()){
+                            let newPhaseSettings = {};
+                            for(const [inputContainer,data] of harvestedData){
+                                newPhaseSettings[inputContainer.load(e.OBJECT_FIELD)]=data;
+                            }
+                            let newPhase = Competition.current.newPhase(newPhaseSettings.name,newPhaseSettings.phaseType);
+                            newPhase.updateSettings(newPhaseSettings);
+                            console.log(newPhase);
+                            phasePopUp$.func.closePopUp();
                         }
                     });
+                    phaseEditor$.querySelector("button[data-form-button='save']").addEventListener("click",(ev)=>{
 
-                    function harvestData(){
+                    });
+                    phaseEditor$.querySelector("button[data-form-button='reset']").addEventListener("click",(ev)=>{
 
-                    }
-                    ElementTemplates.genericForm = new ElementTemplate({
-                        mainElement:"form",
-                        htmlInsert:function(mainForm,options){
-                            let html = parseHTML(`
-                                <section class='formFields'>
-                                Section
-                                </section>
-                                <section class='formControls'>
-                                Controls
-                                </section>
-                            `)
-                            return html;
+                    });
+                    phaseEditor$.querySelector("button[data-form-button='cancel']").addEventListener("click",(ev)=>{
+                        phasePopUp$.func.closePopUp();
+                        phaseEditor$.func.resetValues(true);
+                    });
+
+                    
+                    bracketSectionMenuContainer$.querySelector("button[data-button-function='createPhase']").addEventListener("click",()=>{
+                        phaseEditor$.func.switchMode(e.CREATE);
+                        phaseEditor$.func.resetValues(true);
+                        phasePopUp$.func.openPopUp();
+                    
+                    });
+                    // bracketSectionMenuContainer$.querySelector("button[data-button-function='createPhase']").dispatchEvent(new Event("click"));
+                }
+            }
+        }
+        mainSection:{
+            let FacadeMap;
+            buildingBlocks:{
+                FacadeMap =(function(){
+                    let htmlToUnit = new Map();
+                    let unitToHTML = new Map();
+
+                    return {
+                        set(html,unit){
+                            if(htmlToUnit.has(html)){
+                                const oldUnit = htmlToUnit.get(html);
+                                unitToHTML.delete(oldUnit);
+                            } 
+                            if(unitToHTML.has(unit)){
+                                const oldHtml = unitToHTML.get(unit);
+                                htmlToUnit.delete(oldHtml);
+                            } 
+                            htmlToUnit.set(html,unit);
+                            unitToHTML.set(unit,html);
+                            return true;
                         },
-                        addDataStore:[
-                            [e.MODE, e.CREATE],
-                            [e.CONTROLLED_OBJECT_CONSTRUCTOR, "defined at build"],
-                            [e.CONTROLLED_OBJECT, null],
-                            [e.VERIFICATION_FAILED, Set],
-                            [e.HARVESTED_DATA, null],
-                            [e.PARENT_OBJECT,null],
-                            [e.INPUT_CONTAINER_LIST,Set]
-                            ],
-                            onCreationCode:function(mainForm,options){
-                                const{controlledObjectConstructor} = options;
-                                this.save(e.CONTROLLED_OBJECT_CONSTRUCTOR, controlledObjectConstructor); 
-                            },
-                            onCompletionCode:function(mainForm,options){
-                                const{inputContainerList} = options;
-                                for(const inputContainerOptions of inputContainerList)
-                                this.init.addTemplates([[ElementTemplates.inputContainer,{templateOptions:inputContainerOptions,parentElement:"section.formFields"}]])
+                        get(unitOrHtml){
+                            return htmlToUnit.get(unitOrHtml) ?? unitToHTML.get(unitOrHtml);
+                        },
+                        getHtml(unitOrHtml){
+                            return htmlToUnit.has(unitOrHtml)? (unitOrHtml) : unitToHTML.get(unitOrHtml);
+                        },
+                        getUnit(unitOrHtml){
+                            return unitToHTML.has(unitOrHtml) ? (unitOrHtml) : htmlToUnit.get(unitOrHtml);
+                        },
+                        has(unitOrHtml){
+                            return (htmlToUnit.has(unitOrHtml) || unitToHTML.has(unitOrHtml));
+                        },
+                        delete(htmlorUnit){
+                            if(htmlToUnit.has(htmlorUnit)){
+                                const html = htmlorUnit;
+                                const unit = htmlToUnit.get(html);
+                                htmlToUnit.delete(html)
+                                unitToHTML.delete(unit);
+                                return true;
+                            } 
+                            if(unitToHTML.has(htmlorUnit)){
+                                const unit = htmlorUnit;
+                                const html = unitToHTML.get(unit);
+                                unitToHTML.delete(unit);
+                                htmlToUnit.delete(html);
+                                return true;
+                            } 
+                            return false;
+                        },
+                        createHtmlWrapper(unit){
+                            let html,parentHtml;
+                            if(unit instanceof Competition){
+                                html = ElementTemplates.bracketContainer.build(null,{controlledObject:unit});
                             }
+                            if(unit instanceof Phase){
+                                parentHtml = FacadeMap.getHtml(unit.parent);
+                                html = ElementTemplates.phaseContainer.build(parentHtml,{controlledObject:unit});
+                            }
+                            if(unit instanceof Block){
+                                parentHtml = FacadeMap.getHtml(unit.parent);
+                                html = ElementTemplates.blockContainer.build(parentHtml,{controlledObject:unit});
+                            }
+                            if(unit instanceof Game){
+                                parentHtml = FacadeMap.getHtml(unit.parent);
+                                html = ElementTemplates.gameContainer.build(parentHtml,{controlledObject:unit});
+                            }
+                            this.set(html,unit);
+                            return {html,parentHtml};
+                        }
+                    }
+                })();
+                function refreshCosmetics(){
+                    Break("This function needs to be overriden",{element:this})
+                };
+                function addChild(newChild){
+                    this.func.getChildren();
+                    if(!this.load(e.CONTENTS).has(newChild)) return false;
+                    if(!FacadeMap.has(newChild)) FacadeMap.createHtmlWrapper(newChild);
+                    this.load(e.CHILD_CONTAINER).append(FacadeMap.getHtml(newChild));
+                    return true;
+                }
+                function updateChildOrder(){
+                    let contentsOrder = this.load(e.CONTENTS_ORDER);
+                    contentsOrder.length=0;
+                    for(const child of this.load(e.CONTENTS)){
+                        contentsOrder.push(child);
+                    }
+                   let htmlChildren = this.load(e.CHILD_CONTAINER).children;
+                   contentsOrder.sort((a,b)=>{
+                        let aIndex = htmlChildren.indexOf(FacadeMap.getHtml(a));
+                        aIndex = (aIndex===-1) ? Number.POSITIVE_INFINITY: aIndex;
 
+                        let bIndex = htmlChildren.indexOf(FacadeMap.getHtml(b));
+                        bIndex = (bIndex===-1) ? Number.POSITIVE_INFINITY: bIndex;
+                        return aIndex-bIndex
                     })
+                   contentsOrder.forEach((child,index)=>FacadeMap.getHtml(child).save(e.ORDER,index));
+                }
+                function requestChildrenRefreshCosmetics(){
+                    let children = this.load(e.CONTENTS);
+                    for(const child of children){
+                        let childHtml = FacadeMap.getHtml(child);
+                        childHtml.func.refreshCosmetics();
+                    }
+                }
+                function refreshChildren(){
+                    let childContainer = this.load(e.CHILD_CONTAINER);
+                    let children = this.load(e.CONTENTS);
+                    let childCheckList = new Set(children);
+                    let childOrder = this.load(e.CONTENTS_ORDER);
+                    childContainer.replaceChildren();
+                    //Create new html wrappers
+                    for(const child of children){
+                        FacadeMap.createHtmlWrapper(child);
+                    }
+                    //Place all wrappers of children that previously had an order
+                    for(const child of childOrder){
+                        const childHtml = FacadeMap.getHtml(child);
+                        childContainer.append(childHtml);
+                        childCheckList.remove(child);
+                    }
+                    //Place all wrappers of children that didn't previously have an order
+                    for(const child of childCheckList){
+                        const childHtml = FacadeMap.getHtml(child);
+                        childContainer.append(childHtml);
+                    }
+                    return true;
+                }
+                function getChildren(){
+                    let childArray;
+                    let controlledObject = this.load(e.CONTROLLED_OBJECT);
+                    if(controlledObject instanceof Competition){
+                        childArray = controlledObject.allPhasesArray;
+                    }
+                    if(controlledObject instanceof Phase){
+                        childArray = controlledObject.allBlocksArray;
+                    }
+                    if(controlledObject instanceof Block){
+                        childArray = controlledObject.allGamesArray;
+                    }
+                    if(controlledObject instanceof Game){
+                        childArray = controlledObject.incomingLinks;
+                    }
+                    this.save(e.CONTENTS,new Set(childArray));
+                    return childArray;
+                }
+                
+                ElementTemplates.baseUnitContainer = new ElementTemplate({
+                    htmlInsert:parseHTML(`
+                        <div class='anteChildrenDisplayArea'></div>
+                        <section class='childContainer'></section>
+                        <div class='postChildrenDisplayArea'></div>
+                    `),
+                    addFunctions:[refreshCosmetics,getChildren,refreshChildren,requestChildrenRefreshCosmetics,updateChildOrder,addChild],
+                    addClasses:"unitContainer",
+                    addDataStore:[
+                        [e.CONTROLLED_OBJECT,null],
+                        [e.NAME,null],
+                        [e.ORDER,Number.POSITIVE_INFINITY],
+                        [e.CONTENTS,Set],
+                        [e.CONTENTS_ORDER,Array],
+                        [e.CHILD_CONTAINER,null],
+                    ],
+                    onCreationCode:function(mainDiv,options){
+                        const {controlledObject} = options;
+                        this.save(e.CONTROLLED_OBJECT,controlledObject);
+                        this.save(e.NAME,controlledObject.name);
+                        this.save(e.CHILD_CONTAINER,this.querySelector("section.childContainer"));
+                    }
+
+                });
+
+                ElementTemplates.gameContainer = new ElementTemplate({
+                    mainElement:ElementTemplates.baseUnitContainer,
+                    addAsElder:"gameContainer",
+                    addClasses:"gameContainer"
+                });
+                ElementTemplates.blockContainer = new ElementTemplate({
+                    mainElement:ElementTemplates.baseUnitContainer,
+                    addAsElder:"blockContainer",
+                    addClasses:"blockContainer"
+                });
+                ElementTemplates.phaseContainer = new ElementTemplate({
+                    mainElement:ElementTemplates.baseUnitContainer,
+                    addAsElder:"phaseContainer",
+                    addClasses:"phaseContainer"
+                });
+                function refreshBracketCosmetics(){
+                    const competitionNameLabel$ = this.querySelector("div.anteChildrenDisplayArea span");
+                    competitionNameLabel$.textContent=this.load(e.CONTROLLED_OBJECT).name;
                 }
 
-        }
-        setUp:{
-            let updateCompetitionNameForm$ = bracketSectionMenuContainer$.querySelector("form[data-controlled-object-constructor='Competition']")
-            ElementTemplates.objectController.build(null,{
-                useAsMainDiv:updateCompetitionNameForm$,
-                customButtonControls:true,
-                verificationFunctions: new Map([
-                    ["name",Verify.notBlank],
-                ]),
-                dataHarvestFunctions: new Map([
-                    ["name",Harvest.standardTextInput],
-                ])
-            }).func.importObject(Competition.current);
-            updateCompetitionNameForm$.querySelector("button").addEventListener("click",(ev)=>updateCompetitionNameForm$.func.updateControlledObject());
+                ElementTemplates.bracketContainer = new ElementTemplate({
+                    mainElement:ElementTemplates.baseUnitContainer,
+                    addFunctions:[[refreshBracketCosmetics,"refreshCosmetics"]],
+                    htmlSmartInsert:{html:parseHTML(`Creating Bracket For: <span> </span>`),destination:"div.anteChildrenDisplayArea"},
+                    addAsElder:"bracketContainer",
+                    addClasses:"bracketContainer",
+                    onCompletionCode: function(mainDiv,options){
+                        this.func.refreshCosmetics();
+                        CodeObserver.addHandler(this.load(e.CONTROLLED_OBJECT),(observer,{keyword,currentObject})=>{
+                            if(keyword!==e.EDIT) return;
+                            mainDiv.func.refreshCosmetics();
+                        })
+                    }
+                });
 
-            //testing
-            let testpop=ElementTemplates.popUpBase.build(null)
-            testpop.init.addTemplates([[ElementTemplates.popUpButtons,{prepend:false,parentElement:"menu"}]]);
-            testpop.init.addTemplates([[ElementTemplates.genericForm,{parentElement:"section",templateOptions:{
-                controlledObjectConstructor:Phase,
-                inputContainerList:[
-                    {objectField:"Hello",
-                    htmlContents:parseHTML("<div> yay </div>"),
-                    verify:()=>console.log("verify"),
-                    retrieve:()=>console.log("retrieve"),
-                    harvest:()=>console.log("harvest")}
-                ]
-            }}]]);
-            document.body.append(testpop)
-            testpop.func.openPopUp()
 
-            bracketSectionMenuContainer$.querySelector("button[data-button-function='createPhase']").addEventListener("click",()=>testpop.func.openPopUp())
             
+            }
+            setUp:{
+                function unitCreationHtmlHandler(observer,observation){
+                    const {mark,newObject} = observation;
+                    if(observer!==CodeObserver.Creation) return false;
+                    if(mark===Link) return false //code to update relavent game here later. 
+                    const {html,parentHtml} = FacadeMap.createHtmlWrapper(newObject);
+                }
+                function unitCreationAppendingHandler(observer,observation){
+                    const {mark,newObject} = observation;
+                    if(observer!==CodeObserver.Creation) return false;
+                    if(mark===Link) return false //code to update relavent game here later. 
+                    const unitHtml = FacadeMap.getHtml(newObject);
+                    if(!unitHtml.root){
+                        bracketSection$.append(unitHtml);
+                    } else{
+                        unitHtml.root.func.addChild(newObject);
+                        
+                    }
+                }
+                CodeObserver.addToHandlerGroup(e.CREATE,[unitCreationHtmlHandler],false);
+                CodeObserver.addToHandlerGroup(e.CREATE,[unitCreationAppendingHandler],true);
+                // CodeObserver.addToHandlerGroup(e.CREATE,[(o,obs)=>console.log(obs.mark.name,"async")],true);
+                // CodeObserver.addToHandlerGroup(e.CREATE,[(o,obs)=>console.log(obs.mark.name)],false);
+            } 
         }
     }
 

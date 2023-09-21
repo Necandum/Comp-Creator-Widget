@@ -2,6 +2,7 @@ var Team = (function () {
     let id = 0;
     let allTeams = new Map();
     defineGetter({ obj: Team, name: "allTeams", func: () => new Map(allTeams.entries())});
+    defineGetter({ obj: Team, name: "allTeamsArray", func: () => Array.from(allTeams.values())});
 
     function Team({name = `Unnamed ${id + 1}`}) {
         if (allTeams.has(name)) throw new Error('Team name already exists');
@@ -105,7 +106,6 @@ var Team = (function () {
         this.verifyLinks = function(link){
 
         }
-        CodeObserver.Execution({mark:Team,currentFunction:Team,currentObject:this});
     }
     return Team
 })()

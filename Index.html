@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="Styles/Competitor.css">
     <link rel="stylesheet" href="Styles/Navigator.css">
     <link rel="stylesheet" href="Styles/popUp.css">
+    <link rel="stylesheet" href="Styles/InputContainers.css">
     <title>Document</title>
 </head>
 <body>
@@ -36,7 +37,7 @@
                         <li>
                             <form data-controlled-object-constructor="Competition">
                                 <div class="inputContainer" data-object-field="name">
-                                    <label>Competition Name: <input type="text" /><button type='button'> Update</button></label>
+                                    <label>Competition Name: <input type="text" /><button type='button' data-button-function="create"> Create</button></label>
             
                                 </div>
                             </form>
@@ -162,11 +163,11 @@
                     </div>
                 </div>
                 
-                <div id="bracketSeciton toggleSelection">
+                <div id="bracketSection" class="hiddenByDefault toggleSelection">
 
                 </div>
 
-                <div id="scheduleSection">
+                <div id="scheduleSection" class="hiddenByDefault">
 
                 </div>
             </div>
@@ -184,7 +185,7 @@
     <script src="Verification.js"></script>
     <script src="Registry.js"></script>
     <script src="Search.js"></script>
-    <!-- Agents -->
+    <!-- Agents,nothing runs -->
     <script src="Player.js"></script>
     <script src="Team.js"></script>
     <script src="Division.js"></script>
@@ -197,15 +198,15 @@
 <script src="Scheduler.js"></script>
 <script src="SupportScheduler.js"></script>
 <script src="CSVGenerator.js"></script>
-<script src="UIManager.js"></script>
 <!-- Set-up code necessary for things to run -->
 
+<!-- Display elements on page  -->
+<script src="UIManager.js"></script>
+<script src="Init.js"></script>
+<script src="testing.js"></script>
 </body>
 
 
-<!-- Display elements on page  -->
-<script src="Init.js"></script>
-<script src="testing.js"></script>
 
 
 

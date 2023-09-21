@@ -1,22 +1,32 @@
 var ElementTemplate = (function () {
     let id=0;
-    function ElementTemplate({ htmlInsert,mainElement,addFunctions,addDataStore,addAttributes=[],addEvents = [], addDataset = [], addClasses, addTemplates = [], label, addAsElder, onCreationCode, onCompletionCode }) {
+    function ElementTemplate({ htmlInsert,htmlSmartInsert,mainElement,addFunctions,serialFunctions,addDataStore,addAttributes=[],addEvents = [], addDataset = [], addClasses, addTemplates = [], label, addAsElder, onCreationCode, onCompletionCode }) {
 
         this.__peek = arguments[0];
         
-        this.build = function (root,options={useAsMainDiv:null}) {
-            let templateMainElement = (mainElement) ? document.createElement(mainElement)
-                                                    :document.createElement('div');
+        this.build = function (root,options={useAsMainDiv:null,skipTemplate:false}) {
+            let templateMainElement;
+            if(mainElement instanceof ElementTemplate){
+                let newOptions = {...options};
+                newOptions.skipTemplate = true;
+                templateMainElement = mainElement.build(root,newOptions);
+            } else {
+                templateMainElement = (typeof mainElement ==="string") ? document.createElement(mainElement)
+                                                                       : document.createElement("div");
+            }
+
             let mainDiv = options.useAsMainDiv ?? templateMainElement;
-            let elder = (root) ? root.elder : {};
-            let data = (root) ? root.getActualDataObject():new Map();
-            let localData = new Map();
+            let elder = (mainDiv.elder) ? mainDiv.elder
+                                        :(root) ? root.elder 
+                                                : {};
+            let data = (root) ? root.getActualDataObject()
+                              :(mainDiv.getActualDataObject) ? mainDiv.getActualDataObject()
+                                                             : new Map();
+            let localData = data.get(mainDiv) ?? new Map();
             data.set(mainDiv,localData);
             let uniqueKey = Symbol("Unique Key");
             let uniqueID = ++id;
-            if (addAsElder && elder[addAsElder]) Break("Cannot add two elders of same name", { args: arguments[0], addAsElder })
-            if (addAsElder) elder[addAsElder] = mainDiv;
-            
+    
 
             defineGetter({ obj: mainDiv, name: "root", func: () => root });
             defineGetter({ obj: mainDiv, name: "elder", func: () => ({ ...elder }) });
@@ -24,7 +34,7 @@ var ElementTemplate = (function () {
             defineGetter({ obj: mainDiv, name: "uniqueID", func: () => uniqueID});
             defineGetter({ obj: mainDiv, name: "__data", func: () => localData});
            
-            Object.defineProperty(mainDiv, "template", { value: this,configurable: false, enumerable: true, writable: false });
+           if(!options.skipTemplate) Object.defineProperty(mainDiv, "template", { value: this,configurable: false, enumerable: true, writable: false });
 
             mainDiv.getActualDataObject = function getActualDataObject(){
                 return data;
@@ -41,8 +51,20 @@ var ElementTemplate = (function () {
             }
             mainDiv.init = {};
 
+            mainDiv.init.addAsElder=function(addAsElder,deletePriorRefrences){
+                if (addAsElder && elder[addAsElder]) Break("Cannot add two elders of same name", { args: arguments[0], addAsElder })
+                if(deletePriorRefrences){
+                    for(const elderReference in elder){
+                        if(elder[elderReference]===mainDiv) delete elder[elderReference]
+                    }
+                }
+                if (addAsElder) elder[addAsElder] = mainDiv;
+            }
+            mainDiv.init.addAsElder(addAsElder);
+            
+
             mainDiv.init.addFunctions=function(addFunctions){
-                mainDiv.func ={};
+                mainDiv.func??={};
                 if(addFunctions){
                     if(!Array.isArray(addFunctions)) addFunctions = [addFunctions];
                     for(let functionItem of addFunctions){
@@ -51,9 +73,23 @@ var ElementTemplate = (function () {
                         mainDiv.func[newFuncName]=newFunc.bind(mainDiv);
                     }
                 }
-                Object.freeze(mainDiv.func);
+                if(!options.skipTemplate) Object.freeze(mainDiv.func);
             }
             mainDiv.init.addFunctions(addFunctions);
+
+            mainDiv.init.serialFunctions=function(oldFunctionName,newFunction){
+                let oldFunction = mainDiv.func[oldFunctionName]
+                newFunction = newFunction.bind(mainDiv);
+                mainDiv.func[oldFunctionName] =function combinedFunctions(){
+                  return  newFunction(oldFunction(...arguments),...arguments);
+                }
+            }
+            if(serialFunctions){
+                if(!Array.isArray(serialFunctions)) serialFunctions = [serialFunctions];
+                for(const {oldFunctionName,newFunction} of serialFunctions){
+                    mainDiv.init.serialFunctions(oldFunctionName,newFunction);
+                }
+            }
 
             mainDiv.init.addDataStore=function(addDataStore){
                 if(!addDataStore) return false;
@@ -95,10 +131,42 @@ var ElementTemplate = (function () {
                 }
 
                 for(const childNode of mainDiv.childNodes){
-                 addRootToChildNodes(mainDiv, mainDiv.elder, childNode);
+                 addRootToChildNodes(mainDiv, elder, childNode);
                 }
             }
             mainDiv.init.htmlInsert(htmlInsert);
+
+            mainDiv.init.htmlSmartInsert=function(...htmlInsertionObjects){
+                for(const htmlInsertionObject of htmlInsertionObjects){
+                    if(!htmlInsertionObject) continue;
+                    let {html,destination,insertionMethod}=htmlInsertionObject;
+                if (html) {
+                        let htmlForInsertion;
+                        if(typeof html ==="function"){
+                            htmlForInsertion = html(mainDiv,options);
+                        } else if (html instanceof HTMLElement || html instanceof Node){
+                            htmlForInsertion= html.cloneNode(true);
+                        } else if( typeof htmlInsertItem==='string'){
+                            htmlForInsertion = document.createTextNode(html)
+                        }
+                        else{
+                            Break("htmlInsert must be function or HTMLElement",{html,htmlInsertItem})
+                        }
+                        let targetedElement = mainDiv;
+                        if(destination){
+                            if(typeof destination ==='string') targetedElement = mainDiv.querySelector(destination) ?? targetedElement;
+                            if(destination instanceof Node || destination instanceof HTMLElement) targetedElement = destination;
+                        }
+                        let intendedInsertionMethod = insertionMethod ?? Element.prototype.append;
+                        intendedInsertionMethod.call(targetedElement,html);
+                    }
+                }
+
+                for(const childNode of mainDiv.childNodes){
+                 addRootToChildNodes(mainDiv, elder, childNode);
+                }
+            }
+            mainDiv.init.htmlSmartInsert(htmlSmartInsert);
 
             mainDiv.init.addClasses=function(addClasses){
                 if(addClasses){
@@ -142,14 +210,18 @@ var ElementTemplate = (function () {
             mainDiv.init.addTemplates=function(addTemplates){ 
                 if(!addTemplates) return false;
                 if(!Array.isArray(addTemplates)) addTemplates = [addTemplates];
+                let products =[];
                     for (let item of addTemplates) {
                         if(!Array.isArray(item)) item = [item]
                         let [template,{templateOptions,parentElement,prepend}={}] = item;
                         if (!template instanceof ElementTemplate) Break("addTemplates must be array of ElementTemplators and option pairs", { addTemplates })
                         if(typeof parentElement ==="string") parentElement = mainDiv.querySelector(parentElement);
-                        (parentElement??mainDiv)[(prepend) ? "prepend":"append"](template.build(mainDiv,templateOptions))
+                        let producedElement = template.build(mainDiv,templateOptions)
+                        products.push(producedElement);
+                        (parentElement??mainDiv)[(prepend) ? "prepend":"append"](producedElement)
                     }
-                    }
+                return products
+            }
              mainDiv.init.addTemplates(addTemplates);
 
             if (onCompletionCode && typeof onCompletionCode === "function") onCompletionCode.call(mainDiv,mainDiv,options);
@@ -168,7 +240,7 @@ var ElementTemplate = (function () {
 
     function addRootToChildNodes(root, elder, node) {
         if (!root || !elder || !node) Break("All three arguments required", { root, elder, node });
-        if(node.root!==undefined) return false; //if has already been assigned, skip
+        if(node.root !==undefined) return false; //if has already been assigned, skip
         defineGetter({ obj: node, name: "root", func: () => root });
         defineGetter({ obj: node, name: "elder", func: () => ({ ...elder }) });
 

@@ -1,5 +1,6 @@
 var Block = (function () {
     let id = 0;
+    CodeObserver.register(Block,e.CREATE);
     function Block({ parent, name = null }) {
         let games = [];
         let myId = ++id;
@@ -24,7 +25,6 @@ var Block = (function () {
         this.newGame = function newGame() {
             let game = new Game(this);
             games.push(game);
-            CodeObserver.Execution({ mark: Game, currentFunction: this.newGame, currentObject: this });
             return game;
         }
 
@@ -58,6 +58,7 @@ var Block = (function () {
             validity = newValidity;
             CodeObserver.Execution({ mark: thisBlock, currentFunction: changeValidity, currentObject: thisBlock })
         }
+        CodeObserver.Creation({mark:Block,newObject:this})
     }
 
     Block.prototype = {

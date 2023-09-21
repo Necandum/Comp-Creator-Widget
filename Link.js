@@ -1,6 +1,6 @@
 
 var Link = (function () {
-
+    CodeObserver.register(Link,e.CREATE);
     function Link({ source, target, sourceRank}) {
         if(target instanceof Phase) Break("Links cannot target a Phase",{args:arguments[0]});
         if (source === target) Alert("Source and Target cannot be the same", { args: arguments[0] });
@@ -32,7 +32,7 @@ var Link = (function () {
         target.addLink(this);
         Verification.activate();
         
-
+        CodeObserver.Creation({mark:Link,newObject:this});
     }
 
     Object.freeze(Link);

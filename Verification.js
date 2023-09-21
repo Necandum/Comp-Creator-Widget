@@ -70,8 +70,10 @@ var PostponeMakingAncestralLinks = (function(){
         }
         },
         activate(){
-            this.phases.forEach(phase=>phase.remakeAncestralRegister())
-            this.blocks.forEach(block=>block.remakeAncestralRegister())
+            this.phases.forEach(phase=>phase.remakeAncestralRegister());
+            this.blocks.forEach(block=>block.remakeAncestralRegister());
+            this.phases.clear();
+            this.blocks.clear();
         }
         
         

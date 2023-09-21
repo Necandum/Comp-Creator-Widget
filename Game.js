@@ -1,6 +1,7 @@
 
 var Game = (function () {
     let id = 0;
+    CodeObserver.register(Game,e.CREATE);
     function Game(parent) {
 
         let links = new Set();
@@ -13,6 +14,7 @@ var Game = (function () {
         defineGetter({ obj: this, name: "incomingLinks", func: () => Array.from(links.keys()).filter((cv) => cv.target === this) });
         defineGetter({ obj: this, name: "ancestralLinks", func: () => ancestralLinksRegistrar.ancestralLinks });
         defineGetter({ obj: this, name: "ancestralSources", func: () => new Set(ancestralLinksRegistrar.registry.keys()) });
+        defineGetter({ obj: this, name: "parent", func: () => parent });
         defineGetter({ obj: this, name: "block", func: () => parent });
         defineGetter({ obj: this, name: "phase", func: () => parent.parent });
         defineGetter({ obj: this, name: "gameOrder", func: () => parent.allGamesArray.indexOf(this)+1 });
@@ -65,13 +67,14 @@ var Game = (function () {
         this.remakeAncestralRegister = function remakeAncestralRegister(originatingLink){
             Verification.queue(this)
             if(countParentsThatWillCascade===false){
-                countParentsThatWillCascade = 0;
+                countParentsThatWillCascade = 0; //?? shouldn't it be -1??
                 this.incomingLinks.forEach(inLink => {
                     if(inLink.source.ancestralLinks.has(originatingLink)) countParentsThatWillCascade++
                 })
             } else {
                 countParentsThatWillCascade--
             }
+
             if(countParentsThatWillCascade<=0){
                 countParentsThatWillCascade=false;
                 ancestralLinksRegistrar.wipe();
@@ -80,7 +83,7 @@ var Game = (function () {
                     return false;
                 }
                 else {
-                    PostponeMakingAncestralLinks.queue(this.block,this.phase);
+                    PostponeMakingAncestralLinks.queue(this.block,this.phase);//activation happens inside link delete function, is delayed until the command propogates. 
                     this.outgoingLinks.forEach(iLink=>iLink.target.remakeAncestralRegister(originatingLink));
                 }
                 return true; 
@@ -124,6 +127,7 @@ var Game = (function () {
             validity = newValidity;
             CodeObserver.Execution({ mark: thisGame, currentFunction: changeValidity, currentObject: thisGame })
         }
+        CodeObserver.Creation({mark:Game,newObject:this});
     }
     
     return Game

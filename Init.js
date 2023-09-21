@@ -1,7 +1,5 @@
 // var comp = new Competition("Shark Attack");
-CodeObserver.register(Game);
-CodeObserver.register(Phase);
-CodeObserver.register(Team);
+
 
 // let playerTable = TableGenerator.playerTable.tableTemplate.build();
 // playerTable.append(TableGenerator.playerTable.rowTemplate.build(playerTable));

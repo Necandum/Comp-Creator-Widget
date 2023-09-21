@@ -2,10 +2,12 @@
 var Competition = (function () {
     let id = 0;
     let allCompetitions = [];
+    CodeObserver.register(Competition,e.CREATE);
     defineGetter({ obj: Competition, name: "allCompetitionsArray", func: () => Array.from(allCompetitions) });
     defineGetter({ obj: Competition, name: "current", func: () => allCompetitions[0]});
 
-    function Competition(name) {
+    function Competition({name}) {
+        CodeObserver.register(this);
         let myId = ++id;
         let settings = new Map([])
         let phases = [];
@@ -21,11 +23,11 @@ var Competition = (function () {
        
         this.updateSettings = function(newSettings){
             if(newSettings.name) name = newSettings.name
+            CodeObserver.Execution({mark:this,currentFunction:this.updateSettings,currentObject:this,keyword:e.EDIT})
         }
         this.newPhase = function (phaseName,phaseType) {
             let newPhase = new Phase({ name: phaseName, parent: this, phaseType });
             phases.push(newPhase)
-            CodeObserver.Execution({ mark: Phase, currentFunction: this.newPhase, currentObject: this });
             return newPhase;
         }
 
@@ -118,11 +120,11 @@ var Competition = (function () {
                 }
             }
         }
+        CodeObserver.Creation({mark:Competition,newObject:this});
     }
     return Competition
 })()
 
-new Competition("New Competition");
 /**
      * @param {Game|Phase} startingUnit 
      * @returns {{similarLinks:Set,registry:Map}}

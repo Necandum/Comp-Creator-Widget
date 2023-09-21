@@ -54,6 +54,10 @@ var e = {
         OBJECT_HANDLING:"objectHandlingFunctions",
         OBJECT_FIELD:"objectField",
         INPUT_CONTAINER_LIST:"inputContainerList",
+        ORDER:"order",
+        CONTENTS_ORDER:"contentsOrder",
+        CHILD_CONTAINER:"childContainer",
+
         
         
 

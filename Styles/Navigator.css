@@ -178,7 +178,7 @@
     opacity:100%;
 }
 
-.navigationPanel .navigationSection  .buttonHider:focus-within:before{
+.navigationPanel .navigationSection  .buttonHider:focus-within::before{
     outline: auto;
 }
 .navigationPanel .navigationSection  .buttonHider:has(button:active)::before{

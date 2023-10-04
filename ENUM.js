@@ -57,10 +57,10 @@ var e = {
         ORDER:"order",
         CONTENTS_ORDER:"contentsOrder",
         CHILD_CONTAINER:"childContainer",
-
-        
-        
-
+        SELECTED:"selected",
+        TOP_LINK:"topLink",
+        BOTTOM_LINK:"bottomLink",
+        GAME_ORDER:"gameOrder"
 };
 
 (function () {

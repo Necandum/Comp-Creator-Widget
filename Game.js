@@ -125,7 +125,7 @@ var Game = (function () {
 
         function changeValidity(newValidity) {
             validity = newValidity;
-            CodeObserver.Execution({ mark: thisGame, currentFunction: changeValidity, currentObject: thisGame })
+            // CodeObserver.Execution({ mark: thisGame, currentFunction: changeValidity, currentObject: thisGame })
         }
         CodeObserver.Creation({mark:Game,newObject:this});
     }

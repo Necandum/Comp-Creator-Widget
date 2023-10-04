@@ -77,6 +77,7 @@ var UIManager = (function () {
                         Alert("attempted class not in this group",{useClasses,selectedClass,group});
                     }
                 }
+               
                 return true;
             }
             this.wipeClasses=(groupName,useClasses=[])=>{
@@ -188,6 +189,9 @@ var UIManager = (function () {
     const HTMLTemplates = {};
     const EventTemplates = {};
     const ElementTemplates = {};
+    const KeyNodes={};
+    KeyNodes.popUp = {};
+
     const Harvest = {//Accepts (inputContainer,{insertValue,reset})
         standardTextInput(inputContainer,{insertValue,reset=false}={}) { 
             let inputElement = inputContainer.firstElementChild.firstElementChild;
@@ -225,6 +229,20 @@ var UIManager = (function () {
             if(insertValue!==undefined) inputElement.checked=insertValue;
             let value = inputElement.checked;
             return value;
+        },
+        displayLabel(inputContainer,{insertValue,reset=false}){
+            if(reset) insertValue ="";
+            if(insertValue) inputContainer.firstElementChild.textContent = insertValue;
+            return inputContainer.firstElementChild.textContent;
+        },
+        displayLabelSymbolConversion(objectDictionary){
+            function inner(inputContainer,{insertValue,reset=false}){
+            if(reset) insertValue ="";
+            if(typeof insertValue ==='symbol') insertValue = objectDictionary[insertValue];
+            if(insertValue) inputContainer.firstElementChild.textContent = insertValue;
+            return false;
+            }
+            return inner;
         }
     };
     const Verify = { //func accepts (value), returns T/F
@@ -261,6 +279,7 @@ var UIManager = (function () {
             return inner;
         },
         accessMap(propertyLadderToMap){
+            propertyLadderToMap = ensureArray(propertyLadderToMap);
             function inner(controlledObject,key){
                 let map = Retreive.deepProperty(propertyLadderToMap)(controlledObject);
                 return map.get(key);
@@ -284,6 +303,9 @@ var UIManager = (function () {
         get verify() {
             return new CustomEvent("verify", { bubbles: true })
         },
+    }
+    HTMLTemplates.simpleDisplayLabel = function(defaultText){
+        return parseHTML(`<span class='displayLabel'>${defaultText}</span>`).querySelector("span");
     }
     HTMLTemplates.smartStandardText = function(label){
         let html = parseHTML(`
@@ -318,6 +340,30 @@ var UIManager = (function () {
         label$.textContent=label;
         label$.append(checkbox$);
         return label$;
+    }
+    HTMLTemplates.buttonHider = function(){
+        let span = document.createElement("span");
+        span.classList.add("buttonHider");
+        let button = document.createElement("button");
+        button.setAttribute("type","button");
+        span.append(button);
+        return span;
+    }
+    HTMLTemplates.button = function(){
+        let button = document.createElement("button");
+        button.setAttribute("type","button");
+        return button;
+    }
+    HTMLTemplates.labelledButton = function(label){
+        let button = HTMLTemplates.button();
+        button.append(label);
+        return button;
+    }
+    HTMLTemplates.linkLabel=function(topOrBottom,contents){
+        let div = document.createElement('div');
+        div.classList.add(`${topOrBottom.description}`);
+        div.append(contents);
+        return div;
     }
     topMenu:{
          //Set-up selection links
@@ -386,6 +432,18 @@ var UIManager = (function () {
         
     }
     GenericForm:{
+        ElementTemplates.genericControllingButton = new ElementTemplate({
+            mainElement:"span",
+            htmlInsert:HTMLTemplates.button,
+            addClasses:"controlButton",
+            addDataStore:[[e.CONTROLLED_OBJECT,null]],
+            onCreationCode:function(mainDiv,options){
+                const {addClasses,addDataset,buttonText}=options;
+                this.init.addClasses(addClasses);
+                this.init.addDataset(addDataset);
+                this.querySelector("button").textContent = buttonText;
+            }
+        })
         function harvest({insertValue,reset=false}={}){
             return this.load(e.HARVEST)(this,{insertValue,reset});
         }
@@ -406,6 +464,7 @@ var UIManager = (function () {
                 [e.VERIFICATION,"assigned at runtime"],
                 [e.HARVEST,"assigned at runtime"],
                 [e.RETRIEVE,"assigned at runtime"],
+                [e.EDIT,"assigned at runtime"],
                 [e.OBJECT_FIELD,"assigned at runtime"],
             ],
             onCreationCode:function(mainDiv,options){
@@ -414,12 +473,14 @@ var UIManager = (function () {
                 verify,
                 harvest,
                 retrieve,
+                edit,
                 htmlContents}=options;
 
                 this.save(e.OBJECT_FIELD,objectField);
                 this.save(e.HARVEST,harvest);
                 this.save(e.VERIFICATION,verify);
                 this.save(e.RETRIEVE,retrieve);
+                this.save(e.EDIT,edit);
 
                 this.init.htmlInsert(htmlContents);
                 this.dataset.objectField = objectField;
@@ -430,6 +491,7 @@ var UIManager = (function () {
         function switchMode(newMode){
             this.save(e.MODE,newMode);
             UniqueSelection.select(this,newMode);
+            return newMode;
         }
         function harvestData(){
             let harvestedData = new Map();
@@ -441,18 +503,20 @@ var UIManager = (function () {
         }
         function verifyHarvestedData(){
             let harvestedData = this.load(e.HARVESTED_DATA);
-            this.func.clearVerificationList();
             for(const [inputContainer,value] of harvestedData){
                 if(!inputContainer.func.verify(value)) failedVerification(this,inputContainer);
             }
-            return (this.load(e.VERIFICATION_FAILED).size===0)
+            let result = (this.load(e.VERIFICATION_FAILED).size===0);
+            if(!result) Alert("Verification failed!",{harvestedData})
+            return result;
         }
         function resetValues(toDefaultState){
             let controlledObject = this.load(e.CONTROLLED_OBJECT);
+            this.func.clearVerificationList();
             for(const inputContainer of this.load(e.INPUT_CONTAINER_LIST)){
                 if(!toDefaultState && controlledObject){
                    inputContainer.func.harvest({insertValue:inputContainer.func.retrieve()}) 
-                } else {
+                    } else {
                     inputContainer.func.harvest({reset:true}) 
                 }
             }
@@ -475,6 +539,7 @@ var UIManager = (function () {
         }
         function createObject(){
             let harvestedData = this.func.harvestData();
+            this.func.clearVerificationList();
             if(this.func.verifyHarvestedData()){
                 let creationObject={};
                 for(const [inputContainer,data] of harvestedData){
@@ -486,12 +551,15 @@ var UIManager = (function () {
         }
         function updateObject(){
             let harvestedData = this.func.harvestData();
+            this.func.clearVerificationList();
+
             if(this.func.verifyHarvestedData() && this.load(e.CONTROLLED_OBJECT)){
                 for(const [inputContainer,newValue] of harvestedData){
                     inputContainer.func.edit(newValue);
                 }
                 return true;
             }
+            
             return false;
         }
         function clearVerificationList(){
@@ -533,6 +601,7 @@ var UIManager = (function () {
             addDataStore:[
                 [e.VERIFICATION,"assigned at runtime"],
                 [e.HARVEST,"assigned at runtime"],
+                [e.EDIT,"assigned at runtime"],
                 [e.RETRIEVE,"assigned at runtime"],
                 [e.OBJECT_FIELD,"assigned at runtime"],
                 [e.HARVESTED_DATA,"assigned at runtime"],
@@ -546,6 +615,7 @@ var UIManager = (function () {
                 verify,
                 harvest,
                 retrieve,
+                edit,
                 htmlContents,
                 addAsElder}=options;
 
@@ -553,6 +623,7 @@ var UIManager = (function () {
                 this.save(e.HARVEST,harvest ?? harvestData.bind(mainDiv));
                 this.save(e.VERIFICATION,verify ?? verifyHarvestedData.bind(mainDiv));
                 this.save(e.RETRIEVE,retrieve);
+                this.save(e.EDIT,edit);
 
                 this.init.htmlInsert(htmlContents);
                 this.init.addAsElder(addAsElder);
@@ -684,16 +755,8 @@ var UIManager = (function () {
                 this.func.refreshTeamOptions();
             }
             let selectedSet = this.load(e.CONTENTS)
-            let finalSet = new Set();
-            for(const teamOrDiv of selectedSet){
-                if(teamOrDiv instanceof Team){
-                    finalSet.add(teamOrDiv)
-                }
-                if(teamOrDiv instanceof Division){
-                    teamOrDiv.allTeams.forEach(team=>finalSet.add(team));
-                }
-            }
-            return finalSet;
+          
+            return new Set(selectedSet);
         }
         EventTemplates.selectTeamOrDivision = ElementTemplate.eventObjMaker({
             triggers:"input",
@@ -965,7 +1028,7 @@ var UIManager = (function () {
                             EventTemplates.populateControlledObjectValues,
                             EventTemplates.updateControlledObject],
                 addAsElder: "form",
-                onCreationCode: function (mainForm, options) {
+                onCompletionCode: function (mainForm, options) {
                     let { verificationFunctions, dataHarvestFunctions } = options;
                     mainForm.save(e.CONTROLLED_OBJECT_CONSTRUCTOR, stringToObject(mainForm.dataset.controlledObjectConstructor)); 
                     mainForm.save(e.VERIFICATION, verificationFunctions ?? new Map()); //verification functions is a map, matching field names with functions to verify input. Verification also involves normalisation. 
@@ -1227,8 +1290,8 @@ var UIManager = (function () {
                 let html = parseHTML(htmlString);
                 let navMaster$ = html.querySelector("div.navigationPanelButtons");
                 let buttons$ = navMaster$.querySelectorAll("button[data-display-all]");
-                UniqueSelection.addGroup(navMaster$);
-                buttons$.forEach((button)=>UniqueSelection.addMember(navMaster$,button));
+                // UniqueSelection.addGroup(navMaster$);
+                // buttons$.forEach((button)=>UniqueSelection.addMember(navMaster$,button));
                 buttons$.forEach((button)=>button.addEventListener("click",(ev)=>{
                     button.elder["panel"].func.openObject(stringToObject(button.dataset.displayAll),0);
                 }));
@@ -1237,7 +1300,7 @@ var UIManager = (function () {
             function openObject(object,trimStackToLength=false){
                 if(trimStackToLength!==false) this.func.trimStack(trimStackToLength);
                 this.save(e.CURRENTLY_OPEN,object);
-                this.save(e.SECTION_PARAMETERNS,getSectionParameters(object,this.load(e.IDENTITY)));
+                this.save(e.SECTION_PARAMETERNS,this.func.getSectionParameters(object,this.load(e.IDENTITY)));
                 this.load(e.STACK).push(object);
                 this.func.refreshAppearance();
             }
@@ -1313,7 +1376,7 @@ var UIManager = (function () {
                     }
                 }
             }
-            function getSectionParameters(object,panelIdentity){
+            function getPlayingSectionParameters(object,panelIdentity){
                 let sectionParameters;
 
                 if (object === Player){
@@ -1390,11 +1453,10 @@ var UIManager = (function () {
                 }
                 return sectionParameters
             }
-            ElementTemplates.navigationPanel = new ElementTemplate({
-                htmlInsert:HTMLTemplates.navigationPanel,
+            ElementTemplates.genericNavigationPanel = new ElementTemplate({
                 addClasses:"navigationPanel",
                 addAsElder:"panel",
-                addFunctions:[openObject,trimStack,wipeDisplays,getSelected,refreshAppearance,deleteObjects],
+                addFunctions:[openObject,trimStack,wipeDisplays,getSelected,refreshAppearance,deleteObjects,[getPlayingSectionParameters,"getSectionParameters"]],
                 addDataStore:[
                     [e.STACK,Array],
                     [e.CURRENTLY_OPEN,null],
@@ -1406,6 +1468,14 @@ var UIManager = (function () {
                     let {identity} = options;
                     this.save(e.IDENTITY,identity);
                     this.dataset.identity=identity.description;
+                }
+
+            });
+            ElementTemplates.navigationPanel = new ElementTemplate({
+            mainElement:ElementTemplates.genericNavigationPanel,
+            htmlInsert:HTMLTemplates.navigationPanel,
+                onCreationCode:function(mainDiv,options){
+                    let {identity} = options;
                     this.elder['navigator'].save(identity,this);
                     const removalPane$ = this.querySelector('div.removalPane');
                     const deleteButton$ = removalPane$.querySelector('button[data-button-function="delete"]');
@@ -1686,6 +1756,8 @@ var UIManager = (function () {
                
                 //Phase Editor
                 phaseEditor:{
+                    
+
                     gameStageInputMaker = function(form){
                         let baseStackableInput$ = ElementTemplates.stackableInputContainer.build(form,{
                             objectField:"gameStages",
@@ -1746,6 +1818,7 @@ var UIManager = (function () {
                     function gameStageLineInputAdder(container,destination){
                         let lineInput$ = ElementTemplates.stackableInputContainer.build(container,{
                             addAsElder:"lineinput",
+                            objectField:"null",
                             htmlContents:parseHTML(`
                             <section class='inputContainers'>
                             </section>
@@ -1809,7 +1882,27 @@ var UIManager = (function () {
                     }
                     //Make pop-up
                     const phasePopUp$ = ElementTemplates.popUpBase.build(null);
-                    const [phaseEditor$] = phasePopUp$.init.addTemplates([[ElementTemplates.genericForm,{parentElement:"section",templateOptions:{controlledObjectConstructor:Phase}}]])
+                    KeyNodes.popUp.phaseEditor$ = phasePopUp$;
+
+                    const phaseEditor$ = ElementTemplates.genericForm.build(phasePopUp$,{controlledObjectConstructor:Phase});
+
+                    
+                    phaseEditor$.init.serialFunctions("switchMode",function disablePhaseTypeSelector(newMode){
+                        if(newMode===e.EDIT){
+                            this.querySelector(".inputContainer[data-object-field='phaseType'] select").disabled=true;
+                        } else if(newMode ===e.CREATE){
+                            this.querySelector(".inputContainer[data-object-field='phaseType'] select").disabled=false;
+                        }
+                    })
+                    
+                    bracketSectionMenuContainer$.querySelector("button[data-button-function='createPhase']").addEventListener("click",()=>{
+                        phaseEditor$.func.switchMode(e.CREATE);
+                        phaseEditor$.func.resetValues(true);
+                        phasePopUp$.func.openPopUp();
+                    
+                    });
+
+                    phasePopUp$.querySelector("section").append(phaseEditor$);
                     phaseEditor$.func.addInputContainer(
                     {
                         objectField:"name",
@@ -1823,7 +1916,7 @@ var UIManager = (function () {
                         objectField:"priority",
                         htmlContents:HTMLTemplates.smartStandardNumber("Priority"),
                         verify:Verify.multiple(Verify.notBlank,Verify.positiveInt),
-                        retrieve:Retreive.directProperty,
+                        retrieve:Retreive.accessMap("currentSettings"),
                         harvest:Harvest.smartStandardNumber(0),
                         edit:Edit.newSettings
                     },
@@ -1870,7 +1963,7 @@ var UIManager = (function () {
                             if(!(value instanceof Set)) return false;
                             let flag = true; 
                             value.forEach(teamOrDiv=>{
-                                if(!(teamOrDiv instanceof Team)) flag=false;
+                                if(!(teamOrDiv instanceof Team) && !(teamOrDiv instanceof Division)) flag=false;
                             })
                             return flag; 
                         },
@@ -1899,15 +1992,15 @@ var UIManager = (function () {
                             }
                             let newPhase = Competition.current.newPhase(newPhaseSettings.name,newPhaseSettings.phaseType);
                             newPhase.updateSettings(newPhaseSettings);
-                            console.log(newPhase);
                             phasePopUp$.func.closePopUp();
                         }
                     });
                     phaseEditor$.querySelector("button[data-form-button='save']").addEventListener("click",(ev)=>{
-
+                        phaseEditor$.func.updateObject();
+                        
                     });
                     phaseEditor$.querySelector("button[data-form-button='reset']").addEventListener("click",(ev)=>{
-
+                        phaseEditor$.func.resetValues();
                     });
                     phaseEditor$.querySelector("button[data-form-button='cancel']").addEventListener("click",(ev)=>{
                         phasePopUp$.func.closePopUp();
@@ -1915,14 +2008,14 @@ var UIManager = (function () {
                     });
 
                     
-                    bracketSectionMenuContainer$.querySelector("button[data-button-function='createPhase']").addEventListener("click",()=>{
-                        phaseEditor$.func.switchMode(e.CREATE);
-                        phaseEditor$.func.resetValues(true);
-                        phasePopUp$.func.openPopUp();
                     
-                    });
-                    // bracketSectionMenuContainer$.querySelector("button[data-button-function='createPhase']").dispatchEvent(new Event("click"));
                 }
+                //Currently Selected Game
+                const selectedGameDisplay$ = document.createElement("span");
+                selectedGameDisplay$.dataset.display='selectedGame';
+                let selectedGameDisplayMenuItem$ = document.createElement("li");
+                selectedGameDisplayMenuItem$.append(selectedGameDisplay$);
+                bracketSectionMenuContainer$.append(selectedGameDisplayMenuItem$)
             }
         }
         mainSection:{
@@ -2005,7 +2098,19 @@ var UIManager = (function () {
                     if(!this.load(e.CONTENTS).has(newChild)) return false;
                     if(!FacadeMap.has(newChild)) FacadeMap.createHtmlWrapper(newChild);
                     this.load(e.CHILD_CONTAINER).append(FacadeMap.getHtml(newChild));
+                    this.load(e.CONTENTS_ORDER).push(newChild);
                     return true;
+                }
+                function refreshChildOrder(){
+                    let contentsOrder = this.load(e.CONTENTS_ORDER)
+                    contentsOrder.sort((a,b)=>{ //Sorted in reverse order
+                        let aOrder=  FacadeMap.getHtml(a).load(e.ORDER);
+                        let bOrder=  FacadeMap.getHtml(b).load(e.ORDER);
+                        return bOrder-aOrder;
+                    });
+                    let childContainer = this.load(e.CHILD_CONTAINER);
+                    contentsOrder.forEach(child=>childContainer.prepend(FacadeMap.getHtml(child)));
+                    this.func.updateChildOrder();
                 }
                 function updateChildOrder(){
                     let contentsOrder = this.load(e.CONTENTS_ORDER);
@@ -2013,7 +2118,7 @@ var UIManager = (function () {
                     for(const child of this.load(e.CONTENTS)){
                         contentsOrder.push(child);
                     }
-                   let htmlChildren = this.load(e.CHILD_CONTAINER).children;
+                   let htmlChildren = Array.from(this.load(e.CHILD_CONTAINER).children);
                    contentsOrder.sort((a,b)=>{
                         let aIndex = htmlChildren.indexOf(FacadeMap.getHtml(a));
                         aIndex = (aIndex===-1) ? Number.POSITIVE_INFINITY: aIndex;
@@ -2029,6 +2134,7 @@ var UIManager = (function () {
                     for(const child of children){
                         let childHtml = FacadeMap.getHtml(child);
                         childHtml.func.refreshCosmetics();
+                        childHtml.func.requestChildrenRefreshCosmetics();
                     }
                 }
                 function refreshChildren(){
@@ -2072,14 +2178,15 @@ var UIManager = (function () {
                     this.save(e.CONTENTS,new Set(childArray));
                     return childArray;
                 }
-                
                 ElementTemplates.baseUnitContainer = new ElementTemplate({
                     htmlInsert:parseHTML(`
-                        <div class='anteChildrenDisplayArea'></div>
-                        <section class='childContainer'></section>
-                        <div class='postChildrenDisplayArea'></div>
+                            <div class='anteChildrenDisplayArea'></div>
+                            <div class='contentsDisplayArea'>
+                                <section class='childContainer'></section> 
+                            </div>
+                            <div class='postChildrenDisplayArea'></div>
                     `),
-                    addFunctions:[refreshCosmetics,getChildren,refreshChildren,requestChildrenRefreshCosmetics,updateChildOrder,addChild],
+                    addFunctions:[refreshCosmetics,getChildren,refreshChildren,requestChildrenRefreshCosmetics,updateChildOrder,refreshChildOrder,addChild],
                     addClasses:"unitContainer",
                     addDataStore:[
                         [e.CONTROLLED_OBJECT,null],
@@ -2097,31 +2204,282 @@ var UIManager = (function () {
                     }
 
                 });
+                ElementTemplates.baseAdditionButton = new ElementTemplate({
+                    mainElement:ElementTemplates.genericControllingButton,
+                    addClasses:"unitAdditionButton",
+                    onCreationCode:function(maindDiv,options){
+                        this.querySelector("button").textContent="+"
+                    }
+                })
 
+                ElementTemplates.blockAdditionButton = new ElementTemplate({
+                    mainElement:ElementTemplates.baseAdditionButton,
+                    addClasses:"blockAdditionButton",
+                    onCompletionCode:function(mainDiv,options){
+                        this.addEventListener("click",()=>{
+                            let order = this.elder["blockContainer"]?.load(e.ORDER) ?? Number.POSITIVE_INFINITY;
+                            let createdBlock =  this.elder['phaseContainer'].load(e.CONTROLLED_OBJECT).newBlock();
+                            let createdBlockHtml = FacadeMap.getHtml(createdBlock);
+                            createdBlockHtml.save(e.ORDER,order-0.5);
+                            this.elder['phaseContainer'].func.refreshChildOrder();
+                        });
+                    }
+                })
+                ElementTemplates.gameAdditionButton = new ElementTemplate({
+                    mainElement:ElementTemplates.baseAdditionButton,
+                    addClasses:"gameAdditionButton",
+                    onCompletionCode:function(mainDiv,options){
+                        this.addEventListener("click",()=>{
+                            let order = this.elder['gameContainer']?.load(e.ORDER) ?? Number.POSITIVE_INFINITY;
+                            let createdBlock =  this.elder['blockContainer'].load(e.CONTROLLED_OBJECT).newGame();
+                            let createdBlockHtml = FacadeMap.getHtml(createdBlock);
+                            createdBlockHtml.save(e.ORDER,order-0.5);
+                            this.elder['blockContainer'].func.refreshChildOrder();
+                        });
+                    }
+                })
+                    EventTemplates.gameSelection = new ElementTemplate.eventObjMaker({
+                        triggers:"click",
+                        queryselection:"section.childContainer",
+                        func:function(ev){
+                            let currentlySelected = this.elder['bracketContainer'].load(e.SELECTED);
+                            let chosenGame = this.elder['gameContainer'].load(e.CONTROLLED_OBJECT);
+                            let sourceRank =( ev.button===0) ? 1:2;
+                            if(!currentlySelected || ev.altKey){
+                                this.elder['bracketContainer'].func.selectGame(chosenGame);
+                                return true;
+                            } 
+
+                            if(!ev.ctrlKey){
+                                if(!ev.shiftKey){
+                                    
+                                } else{
+                                    
+                                }
+                            } else{
+                                if(!ev.shiftKey){
+                                    
+                                } else{
+
+                                }
+                            }
+
+                        }
+                    })
+                    function refreshGameDisplay(){
+                        let gameLabelGenFunc = UIManagerObject.gameLabelGenerationFunctions.selected;
+                        let linkLabelGenFunc = UIManagerObject.linkLabelGenerationFunctions.selected;
+                        this.load(e.CHILD_CONTAINER).replaceChildren();
+                        this.func.getGameDisplayIndex();
+                        this.load(e.CHILD_CONTAINER).append(gameLabelGenFunc(this.load(e.CONTROLLED_OBJECT)));
+                        this.load(e.CHILD_CONTAINER).append(HTMLTemplates.linkLabel(e.TOP_LINK,linkLabelGenFunc(this.load(e.TOP_LINK))));
+                        this.load(e.CHILD_CONTAINER).append(HTMLTemplates.linkLabel(e.BOTTOM_LINK,linkLabelGenFunc(this.load(e.BOTTOM_LINK))));
+                    }
+                    function getGameDisplayIndex(){
+                        let index = this.elder['bracketContainer'].load(e.GAME_ORDER).indexOf(this.load(e.CONTROLLED_OBJECT))
+                        this.save(e.GAME_ORDER,index);
+                        return index
+                    }
+                        UIManagerObject.gameLabelGenerationFunctions  = {
+                            select(func){
+                                this.selected=func;
+                            },
+                            simpleName(game){
+                                return game.name;
+                            },
+                            simpleOrder(game){
+                                return `Game ${FacadeMap.getHtml(game).load(e.GAME_ORDER)+1}`
+                            }
+                        }
+                        UIManagerObject.gameLabelGenerationFunctions.select(UIManagerObject.gameLabelGenerationFunctions.simpleOrder);
+
+                        UIManagerObject.linkLabelGenerationFunctions  = {
+                            select(func){
+                                this.selected=func;
+                            },
+                            plain(link){
+                                let ranking;
+                                if(!link) return "No Link"
+                                if(link.source instanceof Game){
+                                    ranking = (link.sourceRank === 1) ? "W":"L"
+                                }
+                                if(link.source instanceof Phase){
+                                    ranking = String(link.sourceRank);
+                                }
+                                return `${link.source.name} (${ranking})`
+                            }
+                        }
+                        UIManagerObject.linkLabelGenerationFunctions.select(UIManagerObject.linkLabelGenerationFunctions.plain);
+
+                    function resetLinkPosition(){
+                        let incomingLinks = this.load(e.CONTROLLED_OBJECT)?.incomingLinks;
+                        if(incomingLinks){
+                            if(incomingLinks.length===0){
+                                this.save(e.TOP_LINK,null)
+                                this.save(e.BOTTOM_LINK,null)
+                            }
+                            if(incomingLinks.length===1){
+                                this.save(e.TOP_LINK,null)
+                                this.save(e.BOTTOM_LINK,incomingLinks[0])
+                            }
+                            if(incomingLinks.length===2){
+                                this.save(e.TOP_LINK,incomingLinks[1])
+                                this.save(e.BOTTOM_LINK,incomingLinks[0])
+                            }
+                        }
+                    }
+                    function assignLinkPosition(link){
+                        if(!this.load(e.BOTTOM_LINK)){ 
+                            this.save(e.BOTTOM_LINK,link);
+                        } else if(!this.load(e.TOP_LINK)) {
+                            this.save(e.TOP_LINK,link)
+                        }       
+                    }
+                    
                 ElementTemplates.gameContainer = new ElementTemplate({
                     mainElement:ElementTemplates.baseUnitContainer,
+                    htmlSmartInsert:{html:HTMLTemplates.labelledButton("Edit"),destination:"div.contentsDisplayArea"},
+                    addEvents:[EventTemplates.gameSelection],
+                    addFunctions:[[refreshGameDisplay,"refreshCosmetics"],resetLinkPosition,assignLinkPosition,getGameDisplayIndex],
                     addAsElder:"gameContainer",
-                    addClasses:"gameContainer"
+                    addClasses:"gameContainer",
+                    addDataStore:[
+                        [e.TOP_LINK,null],
+                        [e.BOTTOM_LINK,null],
+                        [e.GAME_ORDER,null]
+                    ],
+                    addTemplates:[
+                        [ElementTemplates.gameAdditionButton,{parentElement:"div.anteChildrenDisplayArea"}],
+                    ],
+                    onCompletionCode:function(mainDiv,options){
+                        this.load(e.CHILD_CONTAINER).append(this.load(e.CONTROLLED_OBJECT).name); //testing
+                        this.func.resetLinkPosition();
+                    }
                 });
                 ElementTemplates.blockContainer = new ElementTemplate({
                     mainElement:ElementTemplates.baseUnitContainer,
+                    addFunctions:[[()=>false,"refreshCosmetics"]],
                     addAsElder:"blockContainer",
-                    addClasses:"blockContainer"
+                    addClasses:"blockContainer",
+                    addTemplates:[
+                        [ElementTemplates.blockAdditionButton,{parentElement:"div.anteChildrenDisplayArea"}],
+                        [ElementTemplates.gameAdditionButton,{parentElement:"div.contentsDisplayArea"}]],
+                    onCompletionCode:function(mainDiv,options){
+                        mainDiv.append(this.load(e.CONTROLLED_OBJECT).name);
+                    }
                 });
+
+                    EventTemplates.saveFormOnInputChange = ElementTemplate.eventObjMaker({
+                        triggers:"input",
+                        queryselection:"div[data-object-field='priority'] input",
+                        func:function(ev){
+                            this.elder["phaseLabel"].func.updateObject();
+                        }
+                    })
+                    EventTemplates.editPhasePopUp = ElementTemplate.eventObjMaker({
+                        triggers:'click',
+                        queryselection:"span[data-button-function='edit']",
+                        func:function(ev){
+                            KeyNodes.popUp.phaseEditor$.func.openPopUp();
+                            let form = KeyNodes.popUp.phaseEditor$.querySelector("form");
+                            form.func.editingMode(this.elder['phaseLabel'].load(e.CONTROLLED_OBJECT));
+                        }
+                    })
+
+                ElementTemplates.phaseContainerLabel = new ElementTemplate({
+                    mainElement:ElementTemplates.genericForm,
+                    addTemplates:[
+                        [ElementTemplates.genericControllingButton,{templateOptions:{addDataset:[{name:"buttonFunction",value:"edit"}],
+                                                                                     buttonText:"Edit"},
+                                                                    parentElement:"section.formControls"}],
+                    ],
+                    addEvents:[EventTemplates.saveFormOnInputChange,EventTemplates.editPhasePopUp],
+                    addAsElder:"phaseLabel",
+                    addClasses:"phaseContainerLabel",
+                    onCreationCode:function(mainDiv,options){
+                        mainDiv.func.addInputContainer(
+                            {
+                                objectField:"name",
+                                htmlContents: HTMLTemplates.simpleDisplayLabel("Phase Name Here"),
+                                harvest:Harvest.displayLabel,
+                                verify:()=>true,
+                                edit:()=>true,
+                                retrieve:Retreive.directProperty
+                            },
+                            {
+                                objectField:"phaseType",
+                                htmlContents: HTMLTemplates.simpleDisplayLabel("Phase Type Here"),
+                                harvest:Harvest.displayLabelSymbolConversion({[e.ROUND_ROBIN]:"Round Robin",[e.TOURNAMENT]:"Tournament"}),
+                                verify:()=>true,
+                                edit:()=>true,
+                                retrieve:Retreive.directProperty
+                            },
+                            {
+                                objectField:"priority",
+                                htmlContents:HTMLTemplates.smartStandardNumber("Priority"),
+                                harvest:Harvest.smartStandardNumber(0),
+                                verify:Verify.positiveInt,
+                                edit:Edit.newSettings,
+                                retrieve:Retreive.accessMap(["currentSettings"])
+                            },
+                        )
+                        this.func.importObject(this.elder["phaseContainer"].load(e.CONTROLLED_OBJECT));
+                        this.func.resetValues();
+                        CodeObserver.addHandler(this.elder['phaseContainer'].load(e.CONTROLLED_OBJECT),(obs,{keyword})=>{
+                            if(keyword===e.EDIT) mainDiv.func.resetValues();
+                        })
+                        oLog.pform = this;
+                    }
+                })
                 ElementTemplates.phaseContainer = new ElementTemplate({
                     mainElement:ElementTemplates.baseUnitContainer,
+                    addFunctions:[[()=>false,"refreshCosmetics"]],
+                    addTemplates:[[ElementTemplates.phaseContainerLabel,
+                                    {parentElement:"div.postChildrenDisplayArea",
+                                    addDataset:{name:"buttonFunction",value:"edit"},
+                                    templateOptions:{controlledObjectConstructor:Phase}}],
+                                [ElementTemplates.blockAdditionButton,{parentElement:"div.contentsDisplayArea"}]],
                     addAsElder:"phaseContainer",
                     addClasses:"phaseContainer"
                 });
                 function refreshBracketCosmetics(){
                     const competitionNameLabel$ = this.querySelector("div.anteChildrenDisplayArea span");
                     competitionNameLabel$.textContent=this.load(e.CONTROLLED_OBJECT).name;
-                }
 
+                    const selectedGameDisplay$ = bracketSectionMenuContainer$.querySelector("span[data-display='selectedGame']");
+                    const selectedGame = this.load(e.SELECTED);
+                    if(selectedGame){
+                        selectedGameDisplay$.textContent = `Selected: ${selectedGame.name}`;
+                    } else {
+                        selectedGameDisplay$.textContent = `No Game Selected`;
+                    }
+                }
+                function selectGame(selectedGame){
+                    this.save(e.SELECTED,selectedGame);
+                    this.func.refreshCosmetics();
+                }
+                function updateAllGameOrder(){
+                    let allGamesOrder = this.load(e.GAME_ORDER);
+                    allGamesOrder.length=0;
+                    this.func.updateChildOrder();
+                    for(const phase of this.load(e.CONTENTS_ORDER)){
+                        const phaseHtml = FacadeMap.getHtml(phase);
+                        phaseHtml.func.updateChildOrder();
+                        for(const block of phaseHtml.load(e.CONTENTS_ORDER)){
+                            const blockHtml = FacadeMap.getHtml(block)
+                            blockHtml.func.updateChildOrder();
+                            allGamesOrder.push(...blockHtml.load(e.CONTENTS_ORDER));
+                        }
+                    }
+                }
                 ElementTemplates.bracketContainer = new ElementTemplate({
                     mainElement:ElementTemplates.baseUnitContainer,
-                    addFunctions:[[refreshBracketCosmetics,"refreshCosmetics"]],
+                    addFunctions:[[refreshBracketCosmetics,"refreshCosmetics"],selectGame,updateAllGameOrder],
                     htmlSmartInsert:{html:parseHTML(`Creating Bracket For: <span> </span>`),destination:"div.anteChildrenDisplayArea"},
+                    addDataStore:[
+                        [e.SELECTED,null],
+                        [e.GAME_ORDER,Array]
+                    ],
                     addAsElder:"bracketContainer",
                     addClasses:"bracketContainer",
                     onCompletionCode: function(mainDiv,options){
@@ -2140,8 +2498,14 @@ var UIManager = (function () {
                 function unitCreationHtmlHandler(observer,observation){
                     const {mark,newObject} = observation;
                     if(observer!==CodeObserver.Creation) return false;
-                    if(mark===Link) return false //code to update relavent game here later. 
+                    if(mark===Link){
+                        let targetHtml = FacadeMap.getHtml(newObject.target);
+                        targetHtml.func.assignLinkPosition(newObject);
+                        targetHtml.func.refreshCosmetics(); 
+                        return true; 
+                    }
                     const {html,parentHtml} = FacadeMap.createHtmlWrapper(newObject);
+                    return true;
                 }
                 function unitCreationAppendingHandler(observer,observation){
                     const {mark,newObject} = observation;
@@ -2152,6 +2516,11 @@ var UIManager = (function () {
                         bracketSection$.append(unitHtml);
                     } else{
                         unitHtml.root.func.addChild(newObject);
+                        unitHtml.root.func.refreshChildOrder();
+                    }
+                    if(newObject instanceof Game){
+                        unitHtml.elder['bracketContainer'].func.updateAllGameOrder();
+                        unitHtml.elder['bracketContainer'].func.requestChildrenRefreshCosmetics();
                         
                     }
                 }

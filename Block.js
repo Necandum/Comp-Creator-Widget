@@ -56,7 +56,7 @@ var Block = (function () {
 
         function changeValidity(newValidity) {
             validity = newValidity;
-            CodeObserver.Execution({ mark: thisBlock, currentFunction: changeValidity, currentObject: thisBlock })
+            // CodeObserver.Execution({ mark: thisBlock, currentFunction: changeValidity, currentObject: thisBlock })
         }
         CodeObserver.Creation({mark:Block,newObject:this})
     }

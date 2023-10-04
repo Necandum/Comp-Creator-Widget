@@ -135,7 +135,7 @@ var SupportScheduler = (function () {
             if (phase.currentSettings.get(e.SUPPORT_SELECTION) === e.PREDETERMINED) {
                 let phaseEntry = new Set();
                 let allBlocks = phase.allBlocksArray;
-                let phaseSupportTeams = phase.currentSettings.get(e.SUPPORT_TEAMS);
+                let phaseSupportTeams = phase.getSupportTeams();
                 phaseRegistry.set(phase, phaseEntry);
                 for (const team of phaseSupportTeams) {
                     let teamReference = normaliseTeamReference(team)
@@ -155,7 +155,7 @@ var SupportScheduler = (function () {
                 phaseEntry.obtainAvailable = function (timeSlot) {
                     return phaseEntry.get(timeSlot.scheduledItem.block).obtainAvailable(timeSlot);
                 }
-                let phaseSupportTeams = phase.currentSettings.get(e.SUPPORT_TEAMS);
+                let phaseSupportTeams = phase.getSupportTeams();
                 let allBlocks = phase.allBlocksArray;
                 //Set-up back-up teams
                 for (const team of phaseSupportTeams) {

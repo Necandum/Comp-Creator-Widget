@@ -15,8 +15,8 @@ var ElementTemplate = (function () {
                                                                        : document.createElement("div");
             }
 
-            let mainDiv = options.useAsMainDiv ?? templateMainElement;
-            let elder = (mainDiv.elder) ? mainDiv.elder
+            const mainDiv = options.useAsMainDiv ?? templateMainElement;
+            const elder = (mainDiv.elder) ? mainDiv.getActualElderObject()
                                         :(root) ? root.elder 
                                                 : {};
             let data = (root) ? root.getActualDataObject()
@@ -38,6 +38,9 @@ var ElementTemplate = (function () {
 
             mainDiv.getActualDataObject = function getActualDataObject(){
                 return data;
+            }
+            mainDiv.getActualElderObject = function getActualElderObject(){
+                return elder;
             }
             mainDiv.save = function quickSave (dataStoreName, value,overide=true) {
                 if(!localData.has(dataStoreName)) Break("All data stores must be declared in template creation",{localData,addDataStore,args:arguments});
@@ -73,16 +76,20 @@ var ElementTemplate = (function () {
                         mainDiv.func[newFuncName]=newFunc.bind(mainDiv);
                     }
                 }
-                if(!options.skipTemplate) Object.freeze(mainDiv.func);
+                if(!options.skipTemplate) Object.defineProperty(mainDiv,"func",{writable:false})
             }
             mainDiv.init.addFunctions(addFunctions);
 
             mainDiv.init.serialFunctions=function(oldFunctionName,newFunction){
+                Object.defineProperty(mainDiv,"func",{writable:true})
+
                 let oldFunction = mainDiv.func[oldFunctionName]
                 newFunction = newFunction.bind(mainDiv);
+
                 mainDiv.func[oldFunctionName] =function combinedFunctions(){
                   return  newFunction(oldFunction(...arguments),...arguments);
                 }
+                Object.defineProperty(mainDiv,"func",{writable:false})
             }
             if(serialFunctions){
                 if(!Array.isArray(serialFunctions)) serialFunctions = [serialFunctions];
@@ -155,10 +162,10 @@ var ElementTemplate = (function () {
                         let targetedElement = mainDiv;
                         if(destination){
                             if(typeof destination ==='string') targetedElement = mainDiv.querySelector(destination) ?? targetedElement;
-                            if(destination instanceof Node || destination instanceof HTMLElement) targetedElement = destination;
+                            if(destination instanceof Node || destination instanceof HTMLElement) targetedElement = (mainDiv.contains(destination)) ? destination: targetedElement;
                         }
                         let intendedInsertionMethod = insertionMethod ?? Element.prototype.append;
-                        intendedInsertionMethod.call(targetedElement,html);
+                        intendedInsertionMethod.call(targetedElement,htmlForInsertion);
                     }
                 }
 
@@ -166,7 +173,10 @@ var ElementTemplate = (function () {
                  addRootToChildNodes(mainDiv, elder, childNode);
                 }
             }
-            mainDiv.init.htmlSmartInsert(htmlSmartInsert);
+            if(htmlSmartInsert){
+                if(!Array.isArray(htmlSmartInsert)) htmlSmartInsert = [htmlSmartInsert];
+                mainDiv.init.htmlSmartInsert(...htmlSmartInsert);
+            }
 
             mainDiv.init.addClasses=function(addClasses){
                 if(addClasses){
@@ -176,36 +186,15 @@ var ElementTemplate = (function () {
             }
             mainDiv.init.addClasses(addClasses);
 
-            mainDiv.init.addDataSet = function(addDataset){
+            mainDiv.init.addDataset = function(addDataset){
+                if(addDataset===undefined) return false;
+
                 for (const newDataset of addDataset) {
                     mainDiv.dataset[newDataset.name] = newDataset.value;
                 }
             }
-            mainDiv.init.addDataSet(addDataset);
+            mainDiv.init.addDataset(addDataset);
 
-            mainDiv.init.addEvents=function(addEvents){
-                for (const newEvent of addEvents) {
-                    if(!newEvent) continue;
-                    let elements;
-                    if (!newEvent.queryselection) {
-                        elements = [mainDiv]
-                    } else {
-                        const queryResult = mainDiv.querySelectorAll(newEvent.queryselection);
-                        elements = (queryResult.length>0) ? Array.from(queryResult)
-                                                        : (newEvent.selfBackUp) ? [mainDiv]
-                                                                                : (newEvent.optional) ? []
-                                                                                                        : Alert("Failed to find elements by query selection", { newEvent, addEvents, mainDiv, htmlInsert });
-                    }
-                    for (const trigger of newEvent.triggers) {
-                        for(const element of elements){
-                        element.addEventListener(trigger, newEvent.func, newEvent.options)
-                        }
-                    }
-                }
-            }
-            mainDiv.init.addEvents(addEvents);
-
-            if (onCreationCode && typeof onCreationCode === "function") onCreationCode.call(mainDiv,mainDiv,options);
 
             mainDiv.init.addTemplates=function(addTemplates){ 
                 if(!addTemplates) return false;
@@ -222,7 +211,33 @@ var ElementTemplate = (function () {
                     }
                 return products
             }
-             mainDiv.init.addTemplates(addTemplates);
+            //delayed exec
+            mainDiv.init.addEvents=function(addEvents){
+                for (const newEvent of addEvents) {
+                    if(!newEvent) continue;
+                    let elements;
+                   if (!newEvent.queryselection) {
+                       elements = [mainDiv]
+                   } else {
+                       const queryResult = mainDiv.querySelectorAll(newEvent.queryselection);
+                       elements = (queryResult.length>0) ? Array.from(queryResult)
+                                                       : (newEvent.selfBackUp) ? [mainDiv]
+                                                                               : (newEvent.optional) ? []
+                                                                                                       : Break("Failed to find elements by query selection", { newEvent, addEvents, mainDiv, htmlInsert });
+                   }
+                   for (const trigger of newEvent.triggers) {
+                       for(const element of elements){
+                       element.addEventListener(trigger, newEvent.func, newEvent.options)
+                       }
+                   }
+               }
+            } //delayed exec
+
+            if (onCreationCode && typeof onCreationCode === "function") onCreationCode.call(mainDiv,mainDiv,options);
+
+                mainDiv.init.addTemplates(addTemplates);
+
+                mainDiv.init.addEvents(addEvents);
 
             if (onCompletionCode && typeof onCompletionCode === "function") onCompletionCode.call(mainDiv,mainDiv,options);
 

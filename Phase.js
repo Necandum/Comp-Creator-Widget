@@ -2,6 +2,7 @@ var Phase = (function () {
     let id = 0;
     CodeObserver.register(Phase,e.CREATE);
     function Phase({ name, parent,phaseType }) {
+        CodeObserver.register(this);
         let myId = ++id;
         let settings = new Map([
             [e.PRIORITY.description, 1], //int
@@ -27,9 +28,9 @@ var Phase = (function () {
         defineGetter({
             obj: this, name: "currentSettings", func: () => {
                 let newMap = new Map(settings)
-                let newGameStages = deepCopyArrayOfObjects(newMap.get(e.GAME_STAGES));
-                newMap.set(e.GAME_STAGES, newGameStages)
-                newMap.set(e.SUPPORT_TEAMS,new Set(newMap.get(e.SUPPORT_TEAMS)))
+                let newGameStages = deepCopyArrayOfObjects(newMap.get(e.GAME_STAGES.description));
+                newMap.set(e.GAME_STAGES.description, newGameStages)
+                newMap.set(e.SUPPORT_TEAMS.description,new Set(newMap.get(e.SUPPORT_TEAMS.description)))
                 return newMap;
             }
         });
@@ -110,21 +111,21 @@ var Phase = (function () {
 
             function changeValidity(newValidity) {
                 validity = newValidity;
-                CodeObserver.Execution({ mark: thisPhase, currentFunction: changeValidity, currentObject: thisPhase })
+                // CodeObserver.Execution({ mark: thisPhase, currentFunction: changeValidity, currentObject: thisPhase })
             }
 
 
         this.updateSettings = function (newSettings) {
-                if(newSettings["name"]){
+                if(newSettings["name"]!==undefined){
                     let newValue = newSettings["name"]
                     name=newValue;
                 }
-                if(newSettings[e.PRIORITY.description]){
-                    let newValue = newSettings[e.PRIORITY.description]
+                if(newSettings[e.PRIORITY.description]!==undefined){
+                    let newValue = newSettings[e.PRIORITY.description];
                     if (typeof newValue !== "number") throw new Error("New value is not a number");
                     settings.set(e.PRIORITY.description, newValue)
                 }
-                if(newSettings[e.GAME_STAGES.description]){
+                if(newSettings[e.GAME_STAGES.description]!==undefined){
                     let newValue=newSettings[e.GAME_STAGES.description];
                     if (!Array.isArray(newValue)) Break("New value must be an array",{newValue,newSettings})
                     newValue.forEach(element => {
@@ -136,17 +137,30 @@ var Phase = (function () {
                     });
                     settings.set(e.GAME_STAGES.description, newValue);
                     }
-                if(newSettings[e.SUPPORT_TEAMS.description]){
+                if(newSettings[e.SUPPORT_TEAMS.description]!==undefined){
                     let newValue = newSettings[e.SUPPORT_TEAMS.description];
                     if(!(newValue instanceof Set)) Break("Support Teams must be a set",{newSettings});
                     settings.set(e.SUPPORT_TEAMS.description,newValue);
                 }
-                if(newSettings[e.SUPPORT_SELECTION.description]){
+                if(newSettings[e.SUPPORT_SELECTION.description]!==undefined){
                     let newValue=newSettings[e.SUPPORT_SELECTION.description];
                     if(newValue!==e.PREDETERMINED && newValue!==e.TOURNAMENT) Break("Must either be e.PREDETERMINED or e.TOURNAMENT",{newValue});
                     settings.set(e.SUPPORT_SELECTION.description,newValue);
                     }
-            
+                    CodeObserver.Execution({mark:this,currentFunction:this.updateSettings,currentObject:this,keyword:e.EDIT})
+        }
+        this.getSupportTeams = function(){
+            let mixedSet = settings.get(e.SUPPORT_TEAMS.description);
+            let finalSet = new Set();
+            for(const teamOrDiv of mixedSet){
+                    if(teamOrDiv instanceof Team){
+                        finalSet.add(teamOrDiv)
+                    }
+                    if(teamOrDiv instanceof Division){
+                        teamOrDiv.allTeams.forEach(team=>finalSet.add(team));
+                    }
+                }
+                return finalSet;
         }
         CodeObserver.Creation({mark:Phase,newObject:this})
     }

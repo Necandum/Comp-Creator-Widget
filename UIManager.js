@@ -1152,7 +1152,7 @@ var UIManager = (function () {
                 }
             });
 
-            ElementTemplates.navigationEntry = new ElementTemplate({
+            ElementTemplates.genericNavigationEntry = new ElementTemplate({
                 htmlInsert:HTMLTemplates.navigationEntry,
                 addClasses:"navigationEntry",
                 addAsElder:"entry",
@@ -1164,12 +1164,18 @@ var UIManager = (function () {
                     let objectLabel$=this.querySelector('span[data-selectable]');
                     objectLabel$.setAttribute("tabindex",0);
                     this.save(e.CONTROLLED_OBJECT,controlledObject);
-                    objectLabel$.prepend(controlledObject.name);
-
-                    let panelIdentity = this.elder["panel"].load(e.IDENTITY);
-
                     
                     mainLi.addEventListener("contextmenu",(ev)=>ev.preventDefault());
+                    
+                }
+            });
+            ElementTemplates.navigationEntry = new ElementTemplate({
+                mainElement: ElementTemplates.genericNavigationEntry,
+                onCreationCode:function(mainLi,options){
+                    let objectLabel$=this.querySelector('span[data-selectable]');
+                    let panelIdentity = this.elder["panel"].load(e.IDENTITY);
+                    let controlledObject = options.newEntryObject;
+                    objectLabel$.prepend(controlledObject.name);
                     if(panelIdentity===e.MASTER){
                         ExclusiveLongClickTimer( mainLi,masterFunctionSet)
                         mainLi.addEventListener("pointerup",(ev)=>{
@@ -1199,7 +1205,7 @@ var UIManager = (function () {
                 newEntryLocation$.append(ElementTemplates.navigationEntry.build(this,{useAsMainDiv:newLi$,newEntryObject}))
                 UniqueSelection.addMember(this.elder["panel"],newLi$);
             }
-            ElementTemplates.navigationSection = new ElementTemplate({
+            ElementTemplates.genericNavigationSection = new ElementTemplate({
                 htmlInsert:HTMLTemplates.navigationSection,
                 addClasses:"navigationSection",
                 addAsElder:"section",
@@ -1213,16 +1219,28 @@ var UIManager = (function () {
                     this.save(e.CONTENTS,individualSectionParameters);
 
                     let subHeadingDiv$=mainDiv.querySelector("div.navigationSubHeading");
-                    let entryList$=mainDiv.querySelector("ul");
+                    
 
                     let currentObject = this.elder["panel"].load(e.CURRENTLY_OPEN);
-                    let entryArray = funcToObtainArray(currentObject[propertyName]);
+                    let entryArray = funcToObtainArray(currentObject[propertyName] ?? currentObject);
 
                     if(subHeading && entryArray.length>0){
                         subHeadingDiv$.append(subHeading);
                     } else {
                         subHeadingDiv$.remove();
                     }
+
+                }
+            });
+            ElementTemplates.navigationSection = new ElementTemplate({
+                mainElement:ElementTemplates.genericNavigationSection,
+                onCreationCode: function(mainDiv,options){
+                    let individualSectionParameters = this.load(e.CONTENTS);
+                    let {subHeading,funcToObtainArray,propertyName} = individualSectionParameters;
+                    let entryList$=mainDiv.querySelector("ul");
+                    let currentObject = this.elder["panel"].load(e.CURRENTLY_OPEN);
+                    let entryArray = funcToObtainArray(currentObject[propertyName] ?? currentObject);
+
                     for(const newEntryObject of entryArray){
                         this.func.addNavigationEntry(newEntryObject,entryList$);
                     }
@@ -1321,7 +1339,7 @@ var UIManager = (function () {
                 //Entries
                 let sectionParameters = this.load(e.SECTION_PARAMETERNS);
                 for(const individualSectionParameters of sectionParameters){
-                    displayPanel$.append(ElementTemplates.navigationSection.build(this,{individualSectionParameters}))
+                    displayPanel$.append(this.load(e.NAVIGATION_SECTION_TEMPLATE).build(this,{individualSectionParameters}))
                 }
                 //Name
                 
@@ -1352,7 +1370,7 @@ var UIManager = (function () {
                 }
                 //Update associated form headings
                 forceCSSReflow();
-                this.elder['navigator'].func.sendStackToForms();
+                this.elder['navigator']?.func.sendStackToForms();
             }
             function trimStack(toLength){
                 this.load(e.STACK).length=toLength;
@@ -1462,7 +1480,8 @@ var UIManager = (function () {
                     [e.CURRENTLY_OPEN,null],
                     [e.SECTION_PARAMETERNS,Set],
                     [e.IDENTITY,null],
-                    [e.MULTY_SELECT_START,null]
+                    [e.MULTY_SELECT_START,null],
+                    [e.NAVIGATION_SECTION_TEMPLATE,null]
                 ],
                 onCreationCode:function(mainDiv,options){
                     let {identity} = options;
@@ -1477,6 +1496,7 @@ var UIManager = (function () {
                 onCreationCode:function(mainDiv,options){
                     let {identity} = options;
                     this.elder['navigator'].save(identity,this);
+                    this.save(e.NAVIGATION_SECTION_TEMPLATE,ElementTemplates.navigationSection)
                     const removalPane$ = this.querySelector('div.removalPane');
                     const deleteButton$ = removalPane$.querySelector('button[data-button-function="delete"]');
                     const removeButton$ = removalPane$.querySelector('button[data-button-function="remove"]');
@@ -2335,11 +2355,17 @@ var UIManager = (function () {
                             this.save(e.TOP_LINK,link)
                         }       
                     }
-                    
+                    EventTemplates.callLinkPopUp = ElementTemplate.eventObjMaker({
+                        triggers:"click",
+                        queryselection:"button",
+                        func:function(){
+                            KeyNodes.popUp.linkCreation.func.openPopUp();
+                        }
+                    })
                 ElementTemplates.gameContainer = new ElementTemplate({
                     mainElement:ElementTemplates.baseUnitContainer,
                     htmlSmartInsert:{html:HTMLTemplates.labelledButton("Edit"),destination:"div.contentsDisplayArea"},
-                    addEvents:[EventTemplates.gameSelection],
+                    addEvents:[EventTemplates.gameSelection,EventTemplates.callLinkPopUp],
                     addFunctions:[[refreshGameDisplay,"refreshCosmetics"],resetLinkPosition,assignLinkPosition,getGameDisplayIndex],
                     addAsElder:"gameContainer",
                     addClasses:"gameContainer",
@@ -2491,7 +2517,220 @@ var UIManager = (function () {
                     }
                 });
 
+                linkCreationPopUp:{
+                        function selectLinkSource(winner,linkSource){
+                            if(winner){
+                                console.log("Chosen Link",linkSource.name,1)
+                            } else {
+                                console.log("Chosen Link",linkSource.name,2)
+                            }
+                        }
+                        function primaryMasterSelectAction(htmlElem,ev){
+                            const selected = UniqueSelection.toggle(htmlElem.elder["panel"],htmlElem.elder['entry'],false,["primarySelection"]);
+                            if(selected) htmlElem.elder['entry'].func.selectLinkSource(true,htmlElem.elder['entry'].load(e.CONTROLLED_OBJECT))
+                        }
+                        function secondaryMasterSelectAction(htmlElem,ev){
+                            const selected = UniqueSelection.toggle(htmlElem.elder["panel"],htmlElem.elder['entry'],false,["secondarySelection"]);
+                            if(selected) htmlElem.elder['entry'].func.selectLinkSource(false,htmlElem.elder['entry'].load(e.CONTROLLED_OBJECT));
+                        }
+                        let  masterFunctionSet=[
+                            {callBack:(htmlElem,ev)=>primaryMasterSelectAction(htmlElem,ev),timing:{startTime:0,endTime:600}},
+                            {callBack:(htmlElem,ev)=>secondaryMasterSelectAction(htmlElem,ev),timing:{startTime:600,endTime:Number.POSITIVE_INFINITY}}
+                        ]
+                    ElementTemplates.gameNavigationEntry = new ElementTemplate({
+                        mainElement: ElementTemplates.genericNavigationEntry,
+                        addFunctions: [selectLinkSource],
+                        onCreationCode:function(mainLi,options){
+                            let objectLabel$=this.querySelector('span[data-selectable]');
+                            let controlledObject = this.load(e.CONTROLLED_OBJECT);
+                            if(controlledObject instanceof Team || controlledObject instanceof Division || controlledObject instanceof Phase || controlledObject instanceof Block){
+                                objectLabel$.prepend(controlledObject.name);
+                            } else if (controlledObject instanceof Game){
+                                let gameOrder = FacadeMap.getHtml(controlledObject).func.getGameDisplayIndex()+1;
+                                objectLabel$.prepend(`Game ${gameOrder}`)
+                            } 
+                                ExclusiveLongClickTimer( mainLi,masterFunctionSet)
+                                mainLi.addEventListener("pointerup",(ev)=>{
+                                    if(ev.button!==2) return;
+                                    secondaryMasterSelectAction(objectLabel$,ev);
+                                })
+        
+                        }
+                    });
+                        function addGameNavigationEntry(newEntryObject,newEntryLocation$){
+                            console.log("added")
+                            let newLi$= document.createElement("li");
+                             newEntryLocation$.append(ElementTemplates.gameNavigationEntry.build(this,{useAsMainDiv:newLi$,newEntryObject}))
+                            UniqueSelection.addMember(this.elder["panel"],newLi$);
+                        }
+                    ElementTemplates.gameNavigationSection = new ElementTemplate({
+                        mainElement: ElementTemplates.genericNavigationSection,
+                        addFunctions:[[addGameNavigationEntry,"addNavigationEntry"]],
+                        onCompletionCode:function(mainDiv,options){
+                            let individualSectionParameters = this.load(e.CONTENTS);
+                            let {subHeading,funcToObtainArray,propertyName} = individualSectionParameters;
+                            let entryList$=mainDiv.querySelector("ul");
+                            let currentObject = this.elder["panel"].load(e.CURRENTLY_OPEN);
+                            let entryArray = funcToObtainArray(currentObject[propertyName] ?? currentObject);
 
+                            for(const newEntryObject of entryArray){
+                                this.func.addNavigationEntry(newEntryObject,entryList$);
+                            }
+                        }
+                    })
+                        HTMLTemplates.gameNavigationPanel = function(mainDiv){
+                            let htmlString = `
+                            <div class="navigationPanelButtons">
+                                <label> Display All </label>
+                                <button type="button" data-display-all='Division' >Divisions</button>
+                                <button type="button" data-display-all='Team'>Teams</button>
+                                <button type="button" data-display-all='Game'>Games</button>
+                                <button type="button" data-display-all='Phase'>Phases</button>
+                            </div>
+            
+                            <div class="navigationCurrentLocation">
+            
+                            </div>
+            
+                            <div class="navigationStackDisplay">
+                                
+                            </div>
+            
+                            <div class="navigationPanelDisplay">
+            
+                            </div>
+                            
+                        </div>`           
+                            let html = parseHTML(htmlString);
+                            let navMaster$ = html.querySelector("div.navigationPanelButtons");
+                            let buttons$ = navMaster$.querySelectorAll("button[data-display-all]");
+                            
+                            buttons$.forEach((button)=>button.addEventListener("click",(ev)=>{
+                                button.elder["panel"].func.openObject(stringToObject(button.dataset.displayAll),0);
+                            }));
+                            return html;
+                        }
+                        function getGameSectionParameters(object,panelIdentity){
+                            let sectionParameters;
+
+                            if (object === Phase ){
+                                    sectionParameters = [{
+                                        subHeading:null,
+                                        propertyName:null,
+                                        funcToObtainArray: x=>Competition.current.allPhasesArray
+                            }]} else if (object === Game ){
+                                    sectionParameters = [{
+                                        subHeading:null,
+                                        propertyName:null,
+                                        funcToObtainArray: x=>Competition.current.allGamesArray
+                            }]} else if (object === Team ){
+                                    sectionParameters = [{
+                                        subHeading:null,
+                                        propertyName:"allTeams",
+                                        funcToObtainArray: x=>Array.from(x.values())
+                                    }]
+                                } else if (object === Division ){
+                                    sectionParameters = [{
+                                        subHeading:null,
+                                        propertyName:"allDivisionsArray",
+                                        funcToObtainArray: allDivArray=>{
+                                            let allDivSet = new Set(allDivArray);
+                                                allDivArray.forEach(div=>{if(div.parentDivisions.size>0) allDivSet.delete(div)});
+                                            return Array.from(allDivSet);
+                                        }
+                                    },
+                                    {
+                                        subHeading:"All Subdivisions",
+                                        propertyName:"allDivisionsArray",
+                                        funcToObtainArray: allDivArray=>{
+                                            let allDivSet = new Set(allDivArray);
+                                                allDivArray.forEach(div=>{if(div.parentDivisions.size===0) allDivSet.delete(div)});
+                                            return Array.from(allDivSet);
+                                        }
+                                    }]
+                                }  else if (object instanceof Phase ){
+                                    sectionParameters =[
+                                        {subHeading:"Blocks",
+                                        propertyName:"allBlocksArray",
+                                        funcToObtainArray: x=>x}
+                                    ]
+                                }  else if (object instanceof Block ){
+                                    sectionParameters =[
+                                        {subHeading:"Games",
+                                        propertyName:"allGamesArray",
+                                        funcToObtainArray: x=>x}
+                                    ]
+                                }  else if (object instanceof Game ){
+                                    sectionParameters =[
+                                        {subHeading:"Parent Games",
+                                        propertyName:"incomingLinks",
+                                        funcToObtainArray: incomingLinks=>incomingLinks.map(iLink=>iLink.source)},
+                                        {subHeading:"Child Games",
+                                        propertyName:"outgoingLinks",
+                                        funcToObtainArray: outgoingLinks=>outgoingLinks.map(oLink=>oLink.target)},
+                                    ]
+                                }  else if (object instanceof Team ){
+                                    sectionParameters =[
+                                        {subHeading:"Players",
+                                        propertyName:"players",
+                                        funcToObtainArray: playersMap=>Array.from(playersMap.keys())},
+                                        {subHeading:"In Divisions",
+                                        propertyName:"divisions",
+                                        funcToObtainArray: divisionSet=>Array.from(divisionSet)}
+                                    ]
+                                } else if (object instanceof Division ){
+                                    sectionParameters =[
+                                        {subHeading:"Sub-Divisions",
+                                        propertyName:"subDivisions",
+                                        funcToObtainArray: subDivisionsSet=>Array.from(subDivisionsSet)},
+
+                                        {subHeading:"Teams",
+                                        propertyName:"teams",
+                                        funcToObtainArray: teamsSet=>Array.from(teamsSet)},
+
+                                        {subHeading:"In Divisions",
+                                        propertyName:"parentDivisions",
+                                        funcToObtainArray: divisionSet=>Array.from(divisionSet)},
+
+                                        {subHeading:"All Possible Sub-Divisions",
+                                        propertyName:"allSubDivisions",
+                                        funcToObtainArray: subDivisionsSet=>Array.from(subDivisionsSet)},
+                                        
+                                        {subHeading:"All Possible Teams",
+                                        propertyName:"allTeams",
+                                        funcToObtainArray: teamsSet=>Array.from(teamsSet)}
+                                    ];
+                                    
+                                } else if(true){
+                                    Break("Can only get section parameters for games,phases , teams and divisions",{object})
+                                }
+                                return sectionParameters
+                        }
+                    ElementTemplates.gameNavigationPanel = new ElementTemplate({
+                        mainElement:ElementTemplates.genericNavigationPanel,
+                        htmlInsert: HTMLTemplates.gameNavigationPanel,
+                        addFunctions:[[getGameSectionParameters,"getSectionParameters"]],
+                        onCompletionCode: function(mainDiv,options){
+                            this.save(e.NAVIGATION_SECTION_TEMPLATE,ElementTemplates.gameNavigationSection)
+                            
+                        }
+
+                    })
+                    ElementTemplates.linkCreationPopUp = new ElementTemplate({
+                        mainElement:ElementTemplates.popUpBase,
+                        addTemplates:[
+                            [ElementTemplates.gameNavigationPanel,{
+                                templateOptions:{identity:e.MASTER,useAsMainDiv:document.createElement("nav")},
+                                parentElement:"section.popUpContentContainer"}],
+                            [ElementTemplates.gameNavigationPanel,{
+                                    templateOptions:{identity:e.MASTER,useAsMainDiv:document.createElement("nav")},
+                                    parentElement:"section.popUpContentContainer"}],
+                        ]
+
+                    })
+                    
+                    KeyNodes.popUp.linkCreation = ElementTemplates.linkCreationPopUp.build(null)
+                }
             
             }
             setUp:{

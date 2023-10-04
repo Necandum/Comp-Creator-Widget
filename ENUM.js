@@ -60,7 +60,8 @@ var e = {
         SELECTED:"selected",
         TOP_LINK:"topLink",
         BOTTOM_LINK:"bottomLink",
-        GAME_ORDER:"gameOrder"
+        GAME_ORDER:"gameOrder",
+        NAVIGATION_SECTION_TEMPLATE:"navigationSectionTemplate"
 };
 
 (function () {

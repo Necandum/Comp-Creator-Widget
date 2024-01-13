@@ -1,0 +1,40 @@
+
+
+.gameContainer.passedVerification>div.contentsDisplayArea{
+}
+.gameContainer.failedVerification>div.contentsDisplayArea{
+    background-color: red;
+}
+.gameContainer>div.contentsDisplayArea{
+    background-color: blueviolet;
+    padding: 1em;
+    margin:5px;
+}
+
+.blockContainer.passedVerification>div.contentsDisplayArea{
+
+}
+.blockContainer.failedVerification>div.contentsDisplayArea{
+    background-color: red;
+}
+.blockContainer>div.contentsDisplayArea{
+    background-color: greenyellow;
+    padding:1em;
+    margin:10px;
+}
+
+.phaseContainer.passedVerification>div.contentsDisplayArea{
+}
+.phaseContainer.failedVerification>div.contentsDisplayArea{
+    background-color: red;
+}
+.phaseContainer>div.contentsDisplayArea{
+    background-color: bisque;
+    padding:1em;
+}
+
+.verificationSource.debuggingVisible>div.contentsDisplayArea,
+.debuggingVisible .verificationSource>div.contentsDisplayArea
+{
+    background-color: orange;
+}

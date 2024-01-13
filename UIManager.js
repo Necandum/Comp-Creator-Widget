@@ -3,7 +3,7 @@ var UIManager = (function () {
     let UniqueSelection = (function () {
         let registry = new Map([document,new Map()]);
         let defaultClass = "toggleSelection"
-
+        oLog.uniqueSelectionRegistry = registry;
         function UniqueSelection() {
             this.addGroup = (newGroupName,{alternateClasses=[]}={}) => {
                 if (!registry.has(newGroupName)) {
@@ -65,6 +65,7 @@ var UIManager = (function () {
                     selectedMember = group.aliasRegistry.get(selectedMember);
                 }
                 for(const selectedClass of useClasses){
+                    if(selectedClass===null || selectedClass===undefined) continue;
                     if (group.has(selectedClass)){
                         if (group.get(selectedClass).has(selectedMember)) {
                             if(Array.isArray(selectedMember)){
@@ -80,12 +81,36 @@ var UIManager = (function () {
                
                 return true;
             }
+            this.deselect = (groupName,selectedMember,useClasses=[e.DEFAULT])=>{
+                let group = registry.get(groupName) ?? Break("Cannot select member in non-existant group", { groupName, selectedMember, registry });
+                useClasses = new Set(useClasses);
+                if(useClasses.delete(e.DEFAULT)) useClasses.add(defaultClass);
+
+                if (group.aliasRegistry.has(selectedMember)) {
+                    selectedMember = group.aliasRegistry.get(selectedMember);
+                }
+                for(const selectedClass of useClasses){
+                    if(selectedClass===null || selectedClass===undefined) continue;
+                    if (group.has(selectedClass)){
+                        if (group.get(selectedClass).has(selectedMember)) {
+                            if(Array.isArray(selectedMember)){
+                                selectedMember.forEach(x=>x.classList.remove(selectedClass));
+                            } else {
+                                selectedMember.classList.remove(selectedClass);
+                            }
+                        }
+                    } else {
+                        Alert("attempted class not in this group",{useClasses,selectedClass,group});
+                    }
+                }
+                return true;
+            }
             this.wipeClasses=(groupName,useClasses=[])=>{
                 let group = registry.get(groupName) ?? Break("Cannot select member in non-existant group", { groupName, registry });
                 useClasses = new Set(useClasses);
                 if(useClasses.delete(e.DEFAULT)) useClasses.add(defaultClass);
                 for(const [className,groupClassSet] of group){
-                    if(!useClasses.has(className)) continue
+                    if(!useClasses.has(className) && !useClasses.has(e.ALL)) continue
                     for (const member of groupClassSet) {
                         if(Array.isArray(member)){
                             member.forEach(x=>x.classList.remove(className));
@@ -115,12 +140,13 @@ var UIManager = (function () {
                 if (group.aliasRegistry.has(selectedMember)) {
                     selectedMember = group.aliasRegistry.get(selectedMember);
                 }
+                
                 for(const selectedClass of useClasses){
                     let classGroup = group.get(selectedClass);
                     if(!classGroup) continue;
                     if(classGroup.has(selectedMember)){
-                        if(selectedMember.classList.contains(selectedClass)){
-                            selectedMember.classList.remove(selectedClass);
+                        if(selectedMember.classList?.contains(selectedClass) || selectedMember[0]?.classList?.contains(selectedClass)){
+                            this.deselect(groupName,selectedMember,[selectedClass]);
                         } else {
                            classNowPresent = this.select(groupName,selectedMember,addToSelection,[selectedClass]);
                         }
@@ -129,7 +155,7 @@ var UIManager = (function () {
                 return classNowPresent;
             }
         }
-
+        oLog.uniqueSelection=UniqueSelection;
         let controlObject = new UniqueSelection();
         controlObject.addGroup("configurationMenu");
         controlObject.addGroup("configurationSection");
@@ -137,19 +163,20 @@ var UIManager = (function () {
 
         return controlObject
     })();
-
+    
     UIManagerObject = {};
 
     const configurationMenu$ = getE("#configurationMenu");
     const sectionMenus$=getE("#sectionMenus");
     const configurationSectionContainer$ = getE("#configurationSectionContainer");
     const competitorSectionMenuContainer$ = getE("#competitorSectionMenuContainer");
+    const schedulingSectionMenuContainer$ = getE("#schedulingSectionMenuContainer");
     const bracketSectionMenuContainer$ = getE("#bracketSectionMenuContainer");
     const competitorSectionMenu$ = getE("#competitorSectionMenu");
     const displayArea$ = getE('#displayArea');
     const bracketSection$ = getE("#bracketSection");
     const teamForm$ = getE("#competitorTeamTab form");
-    const teamNav$ = getE("#competitorTeamTab nav")
+    const teamNav$ = getE("#competitorTeamTab nav");
     const divisionForm$ = getE("#competitorDivisionTab form");
     const divisionNav$ = getE("#competitorDivisionTab nav")
     const playerForm$ = getE("#competitorPlayerTab form");
@@ -158,6 +185,7 @@ var UIManager = (function () {
     const combinedFormTeam$ = getE("#competitorCombinedTab form[data-controlled-object-constructor='Team']");
     const combinedFormDivision$ = getE("#competitorCombinedTab form[data-controlled-object-constructor='Division']");
     const combinedNav$ = getE("#competitorCombinedTab nav")
+    const schedulingDisplaySection$ = getE("#scheduleSection");
 
     function stringToObject(string) {
         switch (string) {
@@ -187,10 +215,18 @@ var UIManager = (function () {
     }
 
     const HTMLTemplates = {};
+    const HTMLAdditions = {};
     const EventTemplates = {};
     const ElementTemplates = {};
-    const KeyNodes={};
-    KeyNodes.popUp = {};
+    const KeyNodes={
+        popUp:{},
+        unitContainers:{},
+        menu:{},
+        FacadeMap:null
+    };
+
+    oLog.KeyNodes = KeyNodes;
+   
 
     const Harvest = {//Accepts (inputContainer,{insertValue,reset})
         standardTextInput(inputContainer,{insertValue,reset=false}={}) { 
@@ -223,6 +259,18 @@ var UIManager = (function () {
             }
             return  inner;
         },
+        fireChangeSingleCheckbox(inputContainer,{insertValue,reset=false}){
+            let inputElement = inputContainer.firstElementChild.firstElementChild;
+            if(reset) insertValue = false;
+            if(insertValue!==undefined){ 
+                inputElement.checked=insertValue;
+                let ev = new Event("progChange",{bubbles:true});
+                inputElement.dispatchEvent(ev);
+            }
+            let value = inputElement.checked;
+            
+            return value;
+        },
         standardSingleCheckbox(inputContainer,{insertValue,reset=false}){
             let inputElement = inputContainer.firstElementChild.firstElementChild;
             if(reset) insertValue = false;
@@ -243,6 +291,55 @@ var UIManager = (function () {
             return false;
             }
             return inner;
+        },
+        radioButtons(inputContainer,{insertValue,reset=false}){
+            let radioButtons = inputContainer.querySelectorAll("input[type='radio']");
+            let selectedValue;
+            if(reset) insertValue = radioButtons[0].value;
+            for(let radioButton of radioButtons){
+                if(radioButton.value===insertValue) radioButton.checked=true;
+                if(radioButton.checked) selectedValue = radioButton.value;
+            }
+            return selectedValue;
+        },
+        smartStandardTime(hours=0,minutes=0,seconds=0,ms=0){
+            let defaultTime = `
+            ${String(hours).padStart(2,"0")}:
+            ${String(minutes).padStart(2,"0")}:
+            ${String(seconds).padStart(2,"0")}.
+            ${String(ms).padStart(3,"0")}
+            `;
+            defaultTime = removeMultipleLines(defaultTime);
+            
+
+            function inner(inputContainer,{insertValue,reset=false}){
+                let inputElement = inputContainer.firstElementChild.firstElementChild;
+                if(reset) insertValue = defaultTime;
+                if(insertValue!==undefined){
+                    inputElement.value = insertValue ?? defaultTime;
+                }
+                let returnedTimeString = stringNormalisation(inputElement.value);
+                return returnedTimeString;
+            }
+        return inner;
+        },
+        smartStandardDate(date=today.DATE,month=today.MONTH+1,year=today.YEAR){
+            let defaultDate = `
+            ${String(year).padStart(4,"20")}-
+            ${String(month).padStart(2,"0")}-
+            ${String(date).padStart(2,"0")}`;
+            defaultDate = removeMultipleLines(defaultDate);
+
+            function inner(inputContainer,{insertValue,reset=false}){
+                let inputElement = inputContainer.firstElementChild.firstElementChild;
+                if (reset) insertValue = defaultDate;
+                if(insertValue!==undefined){
+                    inputElement.value = insertValue ?? defaultDate;
+                }
+                let returnedDateString = stringNormalisation(inputElement.value);
+                return returnedDateString;
+            }
+        return inner;
         }
     };
     const Verify = { //func accepts (value), returns T/F
@@ -261,11 +358,14 @@ var UIManager = (function () {
         positiveInt(value){
             let numValue = Number(value);
             return (Number.isInteger(numValue) && (numValue >= 0))
+        },
+        boolean(value){
+            return (typeof value ==='boolean')
         }
     };
     const Retreive = { //Accepts (controlloed object,property)
         directProperty(controlledObject,property){
-            return controlledObject[property]
+            return controlledObject?.[property]
         },
         deepProperty(propertyLadder=[]){
             function inner(controlledObject,property){
@@ -297,7 +397,10 @@ var UIManager = (function () {
                 map.set(objectField,newValue);
             }
             return inner;
-        }
+        },
+        directProperty(controlledObject,objectField,newValue){
+             controlledObject[objectField]=newValue;
+        },
     }
     const MakeEvent = {
         get verify() {
@@ -313,9 +416,9 @@ var UIManager = (function () {
         `)
         return html;
     }
-    HTMLTemplates.smartStandardNumber = function(label){
+    HTMLTemplates.smartStandardNumber = function(label,defaultNumber){
         let html = parseHTML(`
-        <label>${label} <input type='number' value='0'/> </label>
+        <label>${label} <input type='number' value='${defaultNumber ? defaultNumber:0}'/> </label>
         `)
         return html;
     }
@@ -341,6 +444,18 @@ var UIManager = (function () {
         label$.append(checkbox$);
         return label$;
     }
+    HTMLTemplates.smartStandardDate = function(label){
+        let html = parseHTML(`
+        <label>${label} <input type='date'/> </label>
+        `)
+        return html;
+    }
+    HTMLTemplates.smartStandardTime = function(label){
+        let html = parseHTML(`
+        <label>${label} <input type='time'/> </label>
+        `)
+        return html;
+    }
     HTMLTemplates.buttonHider = function(){
         let span = document.createElement("span");
         span.classList.add("buttonHider");
@@ -354,9 +469,23 @@ var UIManager = (function () {
         button.setAttribute("type","button");
         return button;
     }
-    HTMLTemplates.labelledButton = function(label){
+    HTMLTemplates.actionButtonFactory = function(label,func){
+        return function inner(){
+            return HTMLTemplates.actionButton(label,func)
+        }
+    }
+    HTMLTemplates.labelledButton = function(label,buttonFunction){
         let button = HTMLTemplates.button();
         button.append(label);
+        if(buttonFunction) button.dataset.buttonFunction=buttonFunction;
+        return button;
+    }
+    HTMLTemplates.actionButton = function(label,func){
+        let button = HTMLTemplates.button();
+        button.append(label);
+        if(func){
+            button.addEventListener("click",func);
+        }
         return button;
     }
     HTMLTemplates.linkLabel=function(topOrBottom,contents){
@@ -364,6 +493,44 @@ var UIManager = (function () {
         div.classList.add(`${topOrBottom.description}`);
         div.append(contents);
         return div;
+    }
+    HTMLTemplates.buttonPanel = function(buttonChoices){
+        const div=document.createElement("div")
+        div.classList.add("buttonPanel");
+        for(const {label,role,func} of buttonChoices){
+            const button = HTMLTemplates.button();
+            button.dataset.buttonFunction=role;
+            button.textContent = label;
+            if(func){
+                button.addEventListener("click",func);
+            };
+            div.append(button);
+        }
+        return div
+    }
+    HTMLTemplates.smartRadioButtons=function(radioGroupName,...radioLabelValues){
+        let radioButtonContainer = document.createElement("div");
+        radioButtonContainer.classList.add("radioButtonContainer");
+        for(let {label,value} of radioLabelValues){
+            let radioButton =document.createElement("input");
+            let radioButtonLabel = document.createElement("label")
+            radioButton.setAttribute("type","radio");
+            radioButton.setAttribute("value",value);
+            radioButton.setAttribute("name",radioGroupName);
+            radioButtonLabel.append(radioButton,label);
+            radioButtonContainer.append(radioButtonLabel);
+        }
+        radioButtonContainer.firstElementChild.firstElementChild.checked=true;
+        return radioButtonContainer;
+    }
+    HTMLTemplates.smartHeading = function(headingTitle){
+        let heading = document.createElement("h1");
+        heading.append(headingTitle);
+        return heading;
+    }
+    HTMLAdditions.hideByDefault = function(htmlElement){
+        htmlElement.classList.add("hiddenByDefault");
+        return htmlElement;
     }
     topMenu:{
          //Set-up selection links
@@ -387,7 +554,11 @@ var UIManager = (function () {
             UniqueSelection.wipeClasses(e.POP_UP,[e.DEFAULT]);
             document.body.classList.remove("noscroll");
         }
+        function addContent(htmlContent,insertionMethod = Element.prototype.append){
+            insertionMethod.call(this.load(e.CONTENTS),htmlContent);
+        }
         ElementTemplates.popUpBase = new ElementTemplate({
+            label:"basePopUp",
             htmlInsert:function(mainDiv,options){
                 let html = parseHTML(`
                 <menu class='popUpWindow'>
@@ -399,16 +570,19 @@ var UIManager = (function () {
             },
             addAsElder:"popupbase",
             addClasses:["popUpBase","hiddenByDefault"],
-            addFunctions:[openPopUp,closePopUp],
+            addDataStore:[[e.CONTENTS,null]],
+            addFunctions:[openPopUp,closePopUp,addContent],
             onCompletionCode:function(){
                 UniqueSelection.addGroup(e.POP_UP);
                 UniqueSelection.addMember(e.POP_UP,this);
                 document.body.append(this);
+                let contentContainer = this.querySelector("section.popUpContentContainer");
+                this.save(e.CONTENTS,contentContainer);
             }
         });
         EventTemplates.closePopUp = ElementTemplate.eventObjMaker({
             triggers:"click",
-            queryselection:"button[data-button-function='primary']",
+            queryselection:"button[data-button-function='close']",
             func:function(ev){
                 this.elder['popupbase'].func.closePopUp();
             }
@@ -418,7 +592,7 @@ var UIManager = (function () {
                 let html = parseHTML(`
                 <nav>
                 <button type="button" data-button-function="primary"> Okay</button>
-                <button type="button" data-button-function="Seconday"> Cancel</button>
+                <button type="button" data-button-function="seconday"> Cancel</button>
                 </nav>
                 `);
                 return html;
@@ -445,16 +619,16 @@ var UIManager = (function () {
             }
         })
         function harvest({insertValue,reset=false}={}){
-            return this.load(e.HARVEST)(this,{insertValue,reset});
+            return this.load(e.HARVEST).call(this,this,{insertValue,reset});
         }
         function retrieve(){
-            return this.load(e.RETRIEVE)(this.elder['form'].load(e.CONTROLLED_OBJECT),this.load(e.OBJECT_FIELD))
+            return this.load(e.RETRIEVE).call(this,this.elder['form'].load(e.CONTROLLED_OBJECT),this.load(e.OBJECT_FIELD))
         }
         function verify(value){
-            return this.load(e.VERIFICATION)(value);
+            return this.load(e.VERIFICATION).call(this,value);
         }
         function edit(newValue){
-            return this.load(e.EDIT)(this.elder['form'].load(e.CONTROLLED_OBJECT),this.load(e.OBJECT_FIELD),newValue);
+            return this.load(e.EDIT).call(this,this.elder['form'].load(e.CONTROLLED_OBJECT),this.load(e.OBJECT_FIELD),newValue);
         }
         ElementTemplates.inputContainer = new ElementTemplate({
             addAsElder:"inputContainer",
@@ -474,20 +648,35 @@ var UIManager = (function () {
                 harvest,
                 retrieve,
                 edit,
-                htmlContents}=options;
+                htmlContents,
+                addEvents}=options;
 
                 this.save(e.OBJECT_FIELD,objectField);
                 this.save(e.HARVEST,harvest);
                 this.save(e.VERIFICATION,verify);
                 this.save(e.RETRIEVE,retrieve);
                 this.save(e.EDIT,edit);
-
                 this.init.htmlInsert(htmlContents);
+                this.init.addEvents(addEvents)
                 this.dataset.objectField = objectField;
             }
         });
 
-        
+        ElementTemplates.formControl = new ElementTemplate({
+            addClasses:"formControlContainer",
+            onCreationCode: function(mainDiv,options){
+                const {html,func,eventObj,controlFunctionLabel='unspecified'}=options;
+                this.init.htmlInsert(html);
+                this.init.addDataset([{name:"controlFunction",value:controlFunctionLabel}]);
+
+                if(func){
+                    this.addEventListener("click",func);
+                }
+                if(eventObj){
+                    this.init.addEvents(eventObj);
+                }
+            }
+        })
         function switchMode(newMode){
             this.save(e.MODE,newMode);
             UniqueSelection.select(this,newMode);
@@ -501,9 +690,19 @@ var UIManager = (function () {
             this.save(e.HARVESTED_DATA,harvestedData);
             return harvestedData;
         }
+        function getHarvestDataMappedByObjectField(){
+            let harvestedData = this.load(e.HARVESTED_DATA);
+            let byObjectField = new Map();
+            for(const [inputContainer,data] of harvestedData){
+                byObjectField.set(inputContainer.load(e.OBJECT_FIELD),data);
+            }
+            return byObjectField;
+        }
         function verifyHarvestedData(){
             let harvestedData = this.load(e.HARVESTED_DATA);
+            this.func.clearVerificationList();
             for(const [inputContainer,value] of harvestedData){
+                if(value===e.NOT_IN_USE) continue;
                 if(!inputContainer.func.verify(value)) failedVerification(this,inputContainer);
             }
             let result = (this.load(e.VERIFICATION_FAILED).size===0);
@@ -516,8 +715,8 @@ var UIManager = (function () {
             for(const inputContainer of this.load(e.INPUT_CONTAINER_LIST)){
                 if(!toDefaultState && controlledObject){
                    inputContainer.func.harvest({insertValue:inputContainer.func.retrieve()}) 
-                    } else {
-                    inputContainer.func.harvest({reset:true}) 
+                } else {
+                   inputContainer.func.harvest({reset:true}) 
                 }
             }
         }
@@ -572,15 +771,24 @@ var UIManager = (function () {
         }
         function addInputContainer(...inputContainerOptionList){
             for(const inputContainerOptions of inputContainerOptionList){
-               let [createdElement]= this.init.addTemplates([[ElementTemplates.inputContainer,{templateOptions:inputContainerOptions,parentElement:"section.inputContainers"}]]);
+               let {destination="section.inputContainers"} = inputContainerOptions;
+               let {uniqueSelectionFamily=null} = inputContainerOptions;
+               let [createdElement]= this.init.addTemplates([[ElementTemplates.inputContainer,{templateOptions:inputContainerOptions,parentElement:destination}]]);
                this.load(e.INPUT_CONTAINER_LIST).add(createdElement);
-               UniqueSelection.addMember(this.elder['form'],createdElement);  
+               UniqueSelection.addMember(this.elder['form'],createdElement); 
+               if(uniqueSelectionFamily){
+                if(!Array.isArray(uniqueSelectionFamily.familyAlias)) uniqueSelectionFamily.familyAlias = [uniqueSelectionFamily.familyAlias]
+                for(let familyAlias of uniqueSelectionFamily.familyAlias){
+                    UniqueSelection.expandFamily(uniqueSelectionFamily.groupName,familyAlias,createdElement)
+                }
+               }
                createdElement.func.harvest({reset:true});
             }
             return this.func;
         }
         function addStackableInputContainer(inputContainerOptions){
-               let [createdElement]= this.init.addTemplates([[ElementTemplates.stackableInputContainer,{templateOptions:inputContainerOptions,parentElement:"section.inputContainers"}]]);
+            let {destination="section.inputContainers"} = inputContainerOptions;
+               let [createdElement]= this.init.addTemplates([[ElementTemplates.stackableInputContainer,{templateOptions:inputContainerOptions,parentElement:destination}]]);
                this.load(e.INPUT_CONTAINER_LIST).add(createdElement);
                UniqueSelection.addMember(this.elder['form'],createdElement);  
             return createdElement.func;
@@ -594,6 +802,33 @@ var UIManager = (function () {
                 }
             }
             inputContainer.remove();
+        }
+        function addFormControls(...formControlList){
+            for(const newFormControl of formControlList){
+               let {html,func,eventObj,controlFunctionLabel,uniqueSelectionFamily,classes} = newFormControl;
+               let [createdElement]=this.init.addTemplates([[ElementTemplates.formControl,{templateOptions:newFormControl,destination:"section.formControls"}]]);
+               if(uniqueSelectionFamily){
+                let {familyAliases,groupName} = uniqueSelectionFamily; 
+                    if(!Array.isArray(familyAliases)) familyAliases = [familyAliases]
+                    for(let familyAlias of familyAliases){
+                        UniqueSelection.expandFamily(groupName ?? this ,familyAlias,createdElement)
+                    }
+                } 
+                if(classes){
+                    if(!Array.isArray(classes)) classes = [classes]
+                    for(let className of classes){
+                        createdElement.classList.add(className);
+                    }
+                }
+            }
+        }
+        function addInputSection(...newSectionNames){
+            for(let newSectionName of newSectionNames){
+                let newSection = document.createElement("section");
+                newSection.classList.add("subordinateInputContainer",newSectionName);
+                newSection.dataset[newSectionName];
+                 this.querySelector("section.inputContainers").append(newSection);
+            }
         }
         ElementTemplates.stackableInputContainer = new ElementTemplate({
             addClasses:["inputContainer","stackableInputContainer"],
@@ -634,7 +869,8 @@ var UIManager = (function () {
             mainElement:"form",
             addAsElder:"form",
             addFunctions:[harvestData,verifyHarvestedData,addInputContainer,addStackableInputContainer,switchMode,
-                clearVerificationList,resetValues,importObject,editingMode,creationMode,createObject,updateObject,removeInputContainer],
+                clearVerificationList,resetValues,importObject,editingMode,creationMode,createObject,updateObject,removeInputContainer,
+                getHarvestDataMappedByObjectField,addFormControls,addInputSection],
             htmlInsert:function(mainForm,options){
                 let html = parseHTML(`
                     <section class='inputContainers'>
@@ -714,8 +950,8 @@ var UIManager = (function () {
             allDivisions$.setAttribute("label","All Divisions")
             let allTeams$ = newE("optgroup");
             allTeams$.setAttribute("label","All Teams")
-            let allDivisions = Division.allDivisionsArray.sort((a,b)=>a.name.localeCompare(b.name));
-            let allTeams = Team.allTeamsArray.sort((a,b)=>a.name.localeCompare(b.name));
+            let allDivisions = Division.allDivisionsArray.sort((a,b)=>a.name?.localeCompare?.(b.name)??0);
+            let allTeams = Team.allTeamsArray.sort((a,b)=>a.name?.localeCompare?.(b.name)??0);
             for(const div of allDivisions){
                 allDivisions$.append(newOption(div));
             }
@@ -737,6 +973,10 @@ var UIManager = (function () {
             let display$ = this.querySelector("div.teamDisplay");
             display$.replaceChildren();
             for(const teamOrDiv of this.load(e.CONTENTS)){
+                if(teamOrDiv.id===null){
+                    this.load(e.CONTENTS).delete(teamOrDiv);
+                    continue;
+                }
                 display$.append(ElementTemplates.teamDisplayTag.build(this,{teamOrDiv}));
             }
 
@@ -786,6 +1026,106 @@ var UIManager = (function () {
                 oLog.teamSelect = this;
             }
         });
+    }
+    displayBoard:{
+        function refreshDisplayText(){
+            let textNode = this.querySelector("div.displayItemText")
+           textNode.textContent= this.func.generateDisplayText();
+        }
+        function generateDisplayText(){
+            let textFunc = this.elder["displayBoard"].load(e.DISPLAY_TYPES).get(this.load(e.DISPLAY_TYPES))["textFunc"];
+            let displayObj = this.load(e.DISPLAY);
+            return textFunc(displayObj);
+        }
+        function deleteDisplayItem(){
+            this.elder['displayBoard'].load(e.DISPLAY).delete(this);
+            this.elder['displayBoard'].func.resetAll();
+        }
+        ElementTemplates.genericDisplayItem = new ElementTemplate({
+            addAsElder:"displayItem",
+            addClasses:"displayItem",
+            htmlInsert:parseHTML(`<div class='displayItemText'></div>`),
+            addFunctions:[refreshDisplayText,generateDisplayText,deleteDisplayItem],
+            addDataStore:[
+                [e.DISPLAY,null],
+                [e.DISPLAY_TYPES,null]
+            ],
+            onCompletionCode: function(mainDiv,options){
+                const {displayType,displayObj}=options;
+                const {textFunc,attributes,classes,smartHtml} = this.elder["displayBoard"].load(e.DISPLAY_TYPES).get(displayType);
+                this.init.addClasses(classes);
+                this.init.addAttributes(attributes);
+                this.init.htmlSmartInsert(smartHtml);
+                this.save(e.DISPLAY,displayObj);
+                this.save(e.DISPLAY_TYPES,displayType);
+                this.func.refreshDisplayText();
+            }
+        })
+        function addDisplayItem(objectForDisplay,displayType,sectionName){
+            if(!displayType || displayType===e.DEFAULT){
+                displayType = Array.from(this.load(e.DISPLAY_TYPES).keys())[0]
+            }
+            let displayItem = ElementTemplates.genericDisplayItem.build(this,{displayObj:objectForDisplay,displayType});
+            this.load(e.DISPLAY).add(displayItem);
+            if(sectionName){
+                this.querySelector(sectionName).append(displayItem)
+            } else {
+            this.append(displayItem);
+            }
+            return displayItem;
+        }
+        function addDisplayType(newDisplayType){
+            const {displayType,textFunc=(obj)=>obj.toString(),attributes=[],classes=[],smartHtml} = newDisplayType;
+            this.load(e.DISPLAY_TYPES).set(displayType,{displayType,textFunc,attributes,classes,smartHtml});
+        }
+        function addSection(section){
+            const {name="unnamed",classes=[]} =section;
+            let sectionHtml = document.createElement("section");
+            sectionHtml.dataset.sectionName=name;
+            for(const className of classes){
+                sectionHtml.classList.add(className);
+            }
+            this.init.htmlSmartInsert({html:sectionHtml,noClone:true})
+        }
+        function refreshAllText(){
+            let displayItems = this.load(e.DISPLAY);
+            for(const displayItem of displayItems){
+                displayItem.func.refreshDisplayText();
+            }
+        }
+        function resetAll(){
+            let oldContents = new Set(this.load(e.DISPLAY));
+            this.func.clearDisplay();
+            for(const oldItem of oldContents){
+                this.func.addDisplayItem(oldItem.load(e.DISPLAY),oldItem.load(e.DISPLAY_TYPES));
+            }
+        }
+        function clearDisplay(){
+            this.save(e.DISPLAY,new Set());
+            this.replaceChildren();
+        }
+        ElementTemplates.genericDisplayBoard = new ElementTemplate({
+            addAsElder:"displayBoard",
+            addClasses:"displayBoard",
+            addFunctions:[addSection,addDisplayItem,addDisplayType,refreshAllText,resetAll,clearDisplay],
+            addDataStore:[
+                [e.DISPLAY,Set],
+                [e.DISPLAY_TYPES,Map]
+            ],
+            onCreationCode: function(mainDiv,options){
+                const {displayTypes=[],sections=[]} = options;
+
+                for(const displayType of displayTypes){
+                    this.func.addDisplayType(displayType);
+                }
+                for(const section of sections){
+                    this.func.addSection(section);
+                }
+            },
+            onCompletionCode: function(mainDiv,options){
+                
+            },
+        })
     }
     competitorsSection: {
         objectControl: {
@@ -968,7 +1308,7 @@ var UIManager = (function () {
             EventTemplates.initiateCreationViaEnter = ElementTemplate.eventObjMaker({
                 triggers:"keydown",
                 func:function(ev){
-                    if(ev.code!=="Enter") return;
+                    if(ev.key!=="Enter") return;
                     if(this.load(e.MODE)===e.CREATE){
                         this.func.objectCreation();
                         ev.target.root.querySelector("input").focus();
@@ -1040,7 +1380,6 @@ var UIManager = (function () {
 
             
         }
-
         navigationPanels:{
             ElementTemplates.navigationLink = new ElementTemplate({
                 addClasses:"navigationLink",
@@ -1063,94 +1402,94 @@ var UIManager = (function () {
                     this.addEventListener("click",(ev)=>this.elder['panel'].func.openObject(stackMember,stackIndex));
                 }
             });
-            HTMLTemplates.navigationEntry = function(mainDiv){
-                let html = parseHTML(`
-                    <span class='buttonHider'><button type='button' data-button-function='explore' tabindex='0'> Open </button></span><!--
-                --><span data-selectable='true' data-pass-through='true'></span><span class='buttonHider'><button type='button' data-button-function='edit' tabindex='0'> Edit</button></span>
-                `);
-                return html;
-            };
-        let  masterFunctionSet=[
-                {callBack:(htmlElem,ev)=>primaryMasterSelectAction(htmlElem,ev),timing:{startTime:0,endTime:600}},
-                {callBack:(htmlElem,ev)=>secondaryMasterSelectAction(htmlElem,ev),timing:{startTime:600,endTime:Number.POSITIVE_INFINITY}}
-            ]
-            let slaveFunctionSet =[
-                {callBack:(htmlElem,ev)=>primarySlaveSelectAction(htmlElem,ev),timing:{startTime:0,endTime:600}},
-                {callBack:(htmlElem,ev)=>secondarySlaveSelectAction(htmlElem,ev),timing:{startTime:600,endTime:Number.POSITIVE_INFINITY}}
-            ]
-            function primaryMasterSelectAction(htmlElem,ev){
-            const selected = UniqueSelection.toggle(htmlElem.elder["panel"],htmlElem.elder['entry'],false,["primarySelection"]);
-            if(selected) htmlElem.elder['entry'].func.sendObjTo(e.LEFT_SLAVE);
-            else htmlElem.elder['navigator'].func.sendStackToForms();
-            }
-            function secondaryMasterSelectAction(htmlElem,ev){
-            const selected = UniqueSelection.toggle(htmlElem.elder["panel"],htmlElem.elder['entry'],false,["secondarySelection"]);
-                if(selected) htmlElem.elder['entry'].func.sendObjTo(e.RIGHT_SLAVE);
-            }
-
-            function primarySlaveSelectAction(htmlElem,ev){
-                let multySelectStart = htmlElem.elder['panel'].load(e.MULTY_SELECT_START);
-                if(!multySelectStart){
-                    multySelectStart = htmlElem.elder['entry'];
-                    htmlElem.elder['panel'].save(e.MULTY_SELECT_START,multySelectStart);
+                HTMLTemplates.navigationEntry = function(mainDiv){
+                    let html = parseHTML(`
+                        <span class='buttonHider'><button type='button' data-button-function='explore' tabindex='0'> Open </button></span><!--
+                    --><span data-selectable='true' data-pass-through='true'></span><span class='buttonHider'><button type='button' data-button-function='edit' tabindex='0'> Edit</button></span>
+                    `);
+                    return html;
+                };
+            let  masterFunctionSet=[
+                    {callBack:(htmlElem,ev)=>primaryMasterSelectAction(htmlElem,ev),timing:{startTime:0,endTime:600}},
+                    {callBack:(htmlElem,ev)=>secondaryMasterSelectAction(htmlElem,ev),timing:{startTime:600,endTime:Number.POSITIVE_INFINITY}}
+                ]
+                let slaveFunctionSet =[
+                    {callBack:(htmlElem,ev)=>primarySlaveSelectAction(htmlElem,ev),timing:{startTime:0,endTime:600}},
+                    {callBack:(htmlElem,ev)=>secondarySlaveSelectAction(htmlElem,ev),timing:{startTime:600,endTime:Number.POSITIVE_INFINITY}}
+                ]
+                function primaryMasterSelectAction(htmlElem,ev){
+                const selected = UniqueSelection.toggle(htmlElem.elder["panel"],htmlElem.elder['entry'],false,["primarySelection"]);
+                if(selected) htmlElem.elder['entry'].func.sendObjTo(e.LEFT_SLAVE);
+                else htmlElem.elder['navigator'].func.sendStackToForms();
                 }
-                let sameSection = multySelectStart.elder['section']===htmlElem.elder['section']
-                    
-                if(ev.shiftKey && sameSection){
-                        UniqueSelection.select(htmlElem.elder["panel"],multySelectStart,false,["primarySelection"]);
-                        let state = 2;
-                        for(const entry of Array.from(htmlElem.elder['entry'].parentNode.children)){
-                            if(entry===htmlElem.elder['entry'] || entry ===multySelectStart) state--;
-                            if(state<2){
-                                UniqueSelection.select(htmlElem.elder["panel"],entry,true,["primarySelection"]);
+                function secondaryMasterSelectAction(htmlElem,ev){
+                const selected = UniqueSelection.toggle(htmlElem.elder["panel"],htmlElem.elder['entry'],false,["secondarySelection"]);
+                    if(selected) htmlElem.elder['entry'].func.sendObjTo(e.RIGHT_SLAVE);
+                }
+
+                function primarySlaveSelectAction(htmlElem,ev){
+                    let multySelectStart = htmlElem.elder['panel'].load(e.MULTY_SELECT_START);
+                    if(!multySelectStart){
+                        multySelectStart = htmlElem.elder['entry'];
+                        htmlElem.elder['panel'].save(e.MULTY_SELECT_START,multySelectStart);
+                    }
+                    let sameSection = multySelectStart.elder['section']===htmlElem.elder['section']
+                        
+                    if(ev.shiftKey && sameSection){
+                            UniqueSelection.select(htmlElem.elder["panel"],multySelectStart,false,["primarySelection"]);
+                            let state = 2;
+                            for(const entry of Array.from(htmlElem.elder['entry'].parentNode.children)){
+                                if(entry===htmlElem.elder['entry'] || entry ===multySelectStart) state--;
+                                if(state<2){
+                                    UniqueSelection.select(htmlElem.elder["panel"],entry,true,["primarySelection"]);
+                                }
+                                if(state===0) return;
                             }
-                            if(state===0) return;
-                        }
-                        UniqueSelection.select(htmlElem.elder["panel"],htmlElem,true,["primarySelection"]);
-                } else {
-                    let action = (ev.ctrlKey) ? "toggle":"select";
-                    let toggledSelectionOn = UniqueSelection[action](htmlElem.elder["panel"],htmlElem.elder['entry'],(ev.ctrlKey && sameSection),["primarySelection"]) ;
-                    if(toggledSelectionOn) htmlElem.elder['panel'].save(e.MULTY_SELECT_START,htmlElem.elder['entry']);
+                            UniqueSelection.select(htmlElem.elder["panel"],htmlElem,true,["primarySelection"]);
+                    } else {
+                        let action = (ev.ctrlKey) ? "toggle":"select";
+                        let toggledSelectionOn = UniqueSelection[action](htmlElem.elder["panel"],htmlElem.elder['entry'],(ev.ctrlKey && sameSection),["primarySelection"]) ;
+                        if(toggledSelectionOn) htmlElem.elder['panel'].save(e.MULTY_SELECT_START,htmlElem.elder['entry']);
+                    }
                 }
-            }
-            function secondarySlaveSelectAction(htmlElem,ev){
-                htmlElem.elder['entry'].func.sendObjTo(e.MASTER);
-            }
-
-            function sendObjTo(destinationIdentity){
-                let destinationPanel = this.elder["navigator"].load(destinationIdentity);
-                destinationPanel.func.openObject(this.load(e.CONTROLLED_OBJECT),0);
-            }
-
-            EventTemplates.exploreObject=ElementTemplate.eventObjMaker({
-                triggers:["click"],
-                queryselection:"button[data-button-function='explore']",
-                func:(ev)=>{
-                    let exploreButton = ev.target;
-                    let controlledObject = exploreButton.elder['entry'].load(e.CONTROLLED_OBJECT);
-                    exploreButton.elder['panel'].func.openObject(controlledObject);
-                    if(isSpaceBar(ev)) exploreButton.elder['panel'].querySelector("li span[data-selectable]").focus();
+                function secondarySlaveSelectAction(htmlElem,ev){
+                    htmlElem.elder['entry'].func.sendObjTo(e.MASTER);
                 }
-            });
 
-            EventTemplates.editObject = ElementTemplate.eventObjMaker({
-                triggers:["click"],
-                queryselection:"button[data-button-function='edit']",
-                func:function(ev){
-                    let controlledObject = ev.target.elder['entry'].load(e.CONTROLLED_OBJECT);
-                    ev.target.elder['navigator'].load(e.ASSOCIATED_FORMS).forEach((form,formConstructor)=>{
-                        try{
-                            if(controlledObject instanceof formConstructor) {
-                                form.func.resetFields();
-                                form.func.importObject(controlledObject)
-                                form.querySelector("input").focus();
+                function sendObjTo(destinationIdentity){
+                    let destinationPanel = this.elder["navigator"].load(destinationIdentity);
+                    destinationPanel.func.openObject(this.load(e.CONTROLLED_OBJECT),0);
+                }
+
+                EventTemplates.exploreObject=ElementTemplate.eventObjMaker({
+                    triggers:["click"],
+                    queryselection:"button[data-button-function='explore']",
+                    func:(ev)=>{
+                        let exploreButton = ev.target;
+                        let controlledObject = exploreButton.elder['entry'].load(e.CONTROLLED_OBJECT);
+                        exploreButton.elder['panel'].func.openObject(controlledObject);
+                        if(isSpaceBar(ev)) exploreButton.elder['panel'].querySelector("li span[data-selectable]").focus();
+                    }
+                });
+
+                EventTemplates.editObject = ElementTemplate.eventObjMaker({
+                    triggers:["click"],
+                    queryselection:"button[data-button-function='edit']",
+                    func:function(ev){
+                        let controlledObject = ev.target.elder['entry'].load(e.CONTROLLED_OBJECT);
+                        ev.target.elder['navigator'].load(e.ASSOCIATED_FORMS).forEach((form,formConstructor)=>{
+                            try{
+                                if(controlledObject instanceof formConstructor) {
+                                    form.func.resetFields();
+                                    form.func.importObject(controlledObject)
+                                    form.querySelector("input").focus();
+                                }
+                            } catch(err){
+                                IgnoreError("Form could'nt edit this object",err)
                             }
-                        } catch(err){
-                            IgnoreError("Form could'nt edit this object",err)
-                        }
-                    });
-                }
-            });
+                        });
+                    }
+                });
 
             ElementTemplates.genericNavigationEntry = new ElementTemplate({
                 htmlInsert:HTMLTemplates.navigationEntry,
@@ -1192,19 +1531,19 @@ var UIManager = (function () {
 
                 }
             });
-            HTMLTemplates.navigationSection = function(mainDiv){
-                let html = parseHTML(`
-                    <div class='navigationSubHeading'></div>
-                    <ul>
-                    </ul>
-                `);
-                return html
-            }
-            function addNavigationEntry(newEntryObject,newEntryLocation$){
-                let newLi$= document.createElement("li");
-                newEntryLocation$.append(ElementTemplates.navigationEntry.build(this,{useAsMainDiv:newLi$,newEntryObject}))
-                UniqueSelection.addMember(this.elder["panel"],newLi$);
-            }
+                HTMLTemplates.navigationSection = function(mainDiv){
+                    let html = parseHTML(`
+                        <div class='navigationSubHeading'></div>
+                        <ul>
+                        </ul>
+                    `);
+                    return html
+                }
+                function addNavigationEntry(newEntryObject,newEntryLocation$){
+                    let newLi$= document.createElement("li");
+                    newEntryLocation$.append(ElementTemplates.navigationEntry.build(this,{useAsMainDiv:newLi$,newEntryObject}))
+                    UniqueSelection.addMember(this.elder["panel"],newLi$);
+                }
             ElementTemplates.genericNavigationSection = new ElementTemplate({
                 htmlInsert:HTMLTemplates.navigationSection,
                 addClasses:"navigationSection",
@@ -1472,6 +1811,7 @@ var UIManager = (function () {
                 return sectionParameters
             }
             ElementTemplates.genericNavigationPanel = new ElementTemplate({
+                label:"genericNavigationPanel",
                 addClasses:"navigationPanel",
                 addAsElder:"panel",
                 addFunctions:[openObject,trimStack,wipeDisplays,getSelected,refreshAppearance,deleteObjects,[getPlayingSectionParameters,"getSectionParameters"]],
@@ -1637,10 +1977,7 @@ var UIManager = (function () {
 
             
         }
-    
             // EventTemplates.
-        
-
         setUpSection: {
         
             //Set-up competitor menu
@@ -1730,7 +2067,6 @@ var UIManager = (function () {
                 ])
             });
         }
-
     }
     bracketSection:{
 
@@ -1750,11 +2086,11 @@ var UIManager = (function () {
                 })
                 let compCreateButton$= updateCompetitionNameForm$.querySelector("button");
                 
-                function createComp(){
-                    updateCompetitionNameForm$.func.objectCreation();
-                    updateCompetitionNameForm$.func.populateValues();
-                }
-                compCreateButton$.addEventListener("click",createComp);
+                    function createComp(){
+                        updateCompetitionNameForm$.func.objectCreation();
+                        updateCompetitionNameForm$.func.populateValues();
+                    }
+                    compCreateButton$.addEventListener("click",createComp);
 
                 function compCreationHandler(observer,observation){
                     if(observer!==CodeObserver.Creation) return false;
@@ -2030,12 +2366,31 @@ var UIManager = (function () {
                     
                     
                 }
-                //Currently Selected Game
-                const selectedGameDisplay$ = document.createElement("span");
-                selectedGameDisplay$.dataset.display='selectedGame';
-                let selectedGameDisplayMenuItem$ = document.createElement("li");
-                selectedGameDisplayMenuItem$.append(selectedGameDisplay$);
-                bracketSectionMenuContainer$.append(selectedGameDisplayMenuItem$)
+
+                //Toggle Debugging
+                {
+                    const debuggingButton$ = bracketSectionMenuContainer$.querySelector("button[data-button-function='toggleDebugging']");
+                    debuggingButton$.addEventListener('click',function(ev){
+                        if(this.dataset.activated=="false"){
+                            KeyNodes.unitContainers.bracketContainer.func.debuggingMode(true);
+                            this.dataset.activated="true";
+                            this.textContent = "Hide Debugging"
+                        } else {
+                            KeyNodes.unitContainers.bracketContainer.func.debuggingMode(false);
+                            this.dataset.activated="false";
+                            this.textContent = "Show Debugging"
+                        }
+                    })
+                }
+                //Autogenerate Bracket
+                bracketGeneration:{
+                    const autoGenerateButton$ = bracketSectionMenuContainer$.querySelector("button[data-button-function='autoGeneratePopUp']");
+                    autoGenerateButton$.addEventListener("click",()=>{
+                        KeyNodes.popUp.autoBracket.querySelector(".teamSelector").func.refreshTeamOptions();
+                        KeyNodes.popUp.autoBracket.querySelector(".teamSelector").func.refreshDisplay();
+                        KeyNodes.popUp.autoBracket.func.openPopUp();
+                    })
+                }
             }
         }
         mainSection:{
@@ -2105,11 +2460,15 @@ var UIManager = (function () {
                                 parentHtml = FacadeMap.getHtml(unit.parent);
                                 html = ElementTemplates.gameContainer.build(parentHtml,{controlledObject:unit});
                             }
+                            if(!html) Break("Did not recoginse unit to create a htmlWrapper",{unit})
                             this.set(html,unit);
                             return {html,parentHtml};
                         }
                     }
                 })();
+                oLog.FacadeMap = FacadeMap;
+                KeyNodes.FacadeMap = FacadeMap;
+                bracketDislay:{
                 function refreshCosmetics(){
                     Break("This function needs to be overriden",{element:this})
                 };
@@ -2123,6 +2482,7 @@ var UIManager = (function () {
                 }
                 function refreshChildOrder(){
                     let contentsOrder = this.load(e.CONTENTS_ORDER)
+                    contentsOrder = contentsOrder.filter((unit)=>FacadeMap.has(unit));
                     contentsOrder.sort((a,b)=>{ //Sorted in reverse order
                         let aOrder=  FacadeMap.getHtml(a).load(e.ORDER);
                         let bOrder=  FacadeMap.getHtml(b).load(e.ORDER);
@@ -2133,28 +2493,26 @@ var UIManager = (function () {
                     this.func.updateChildOrder();
                 }
                 function updateChildOrder(){
-                    let contentsOrder = this.load(e.CONTENTS_ORDER);
-                    contentsOrder.length=0;
-                    for(const child of this.load(e.CONTENTS)){
-                        contentsOrder.push(child);
-                    }
-                   let htmlChildren = Array.from(this.load(e.CHILD_CONTAINER).children);
-                   contentsOrder.sort((a,b)=>{
+                    this.func.getChildren() //needed?
+                    let contentsOrder = [...this.load(e.CONTENTS)]
+                    let htmlChildren = Array.from(this.load(e.CHILD_CONTAINER).children);
+                    contentsOrder.sort((a,b)=>{
                         let aIndex = htmlChildren.indexOf(FacadeMap.getHtml(a));
                         aIndex = (aIndex===-1) ? Number.POSITIVE_INFINITY: aIndex;
-
+                        
                         let bIndex = htmlChildren.indexOf(FacadeMap.getHtml(b));
                         bIndex = (bIndex===-1) ? Number.POSITIVE_INFINITY: bIndex;
                         return aIndex-bIndex
                     })
-                   contentsOrder.forEach((child,index)=>FacadeMap.getHtml(child).save(e.ORDER,index));
+                    contentsOrder.forEach((child,index)=>FacadeMap.getHtml(child).save(e.ORDER,index));
+                    this.save(e.CONTENTS_ORDER,contentsOrder);
                 }
                 function requestChildrenRefreshCosmetics(){
                     let children = this.load(e.CONTENTS);
                     for(const child of children){
                         let childHtml = FacadeMap.getHtml(child);
-                        childHtml.func.refreshCosmetics();
-                        childHtml.func.requestChildrenRefreshCosmetics();
+                        childHtml?.func.refreshCosmetics();
+                        childHtml?.func.requestChildrenRefreshCosmetics();
                     }
                 }
                 function refreshChildren(){
@@ -2198,32 +2556,65 @@ var UIManager = (function () {
                     this.save(e.CONTENTS,new Set(childArray));
                     return childArray;
                 }
-                ElementTemplates.baseUnitContainer = new ElementTemplate({
-                    htmlInsert:parseHTML(`
-                            <div class='anteChildrenDisplayArea'></div>
-                            <div class='contentsDisplayArea'>
-                                <section class='childContainer'></section> 
-                            </div>
-                            <div class='postChildrenDisplayArea'></div>
-                    `),
-                    addFunctions:[refreshCosmetics,getChildren,refreshChildren,requestChildrenRefreshCosmetics,updateChildOrder,refreshChildOrder,addChild],
-                    addClasses:"unitContainer",
-                    addDataStore:[
-                        [e.CONTROLLED_OBJECT,null],
-                        [e.NAME,null],
-                        [e.ORDER,Number.POSITIVE_INFINITY],
-                        [e.CONTENTS,Set],
-                        [e.CONTENTS_ORDER,Array],
-                        [e.CHILD_CONTAINER,null],
-                    ],
-                    onCreationCode:function(mainDiv,options){
-                        const {controlledObject} = options;
-                        this.save(e.CONTROLLED_OBJECT,controlledObject);
-                        this.save(e.NAME,controlledObject.name);
-                        this.save(e.CHILD_CONTAINER,this.querySelector("section.childContainer"));
-                    }
+                function markFailure(){
+                    this.classList.add("failedVerification");
+                    this.classList.remove("passedVerification");
+                }
+                function markSuccess(){
+                    this.classList.add("passedVerification");
+                    this.classList.remove("failedVerification");
+                }
+                const deleteUnit = (function(){
+                    let refreshQueued = false;
+                        function deleteUnit(){
+                            UniqueSelection.deleteMember(Verification,this);
+                            CodeObserver.deregister(this.load(e.CONTROLLED_OBJECT))
+                            FacadeMap.delete(this);
+                            this.save(e.CONTROLLED_OBJECT,null)
+                            this.remove();
+                            if(!refreshQueued){
+                                queueMicrotask(()=>{
+                                    this.elder['bracketContainer'].func.updateAllGameOrder();
+                                    this.elder['bracketContainer'].func.requestChildrenRefreshCosmetics();
+                                    refreshQueued = false;
+                                })
+                            }
+                            return this.load(e.CONTENTS);
+                        }
+                    return deleteUnit
+                    })()
+                UniqueSelection.addGroup(Verification,{alternateClasses:["verificationSuspect","verificationSource","verificationTarget","debuggingVisible"]});
 
-                });
+            ElementTemplates.baseUnitContainer = new ElementTemplate({
+                htmlInsert:parseHTML(`
+                        <div class='anteChildrenDisplayArea'></div>
+                        <div class='contentsDisplayArea'>
+                            <section class='childContainer'></section> 
+                        </div>
+                        <div class='postChildrenDisplayArea'></div>
+                `),
+                addFunctions:[refreshCosmetics,getChildren,refreshChildren,requestChildrenRefreshCosmetics,
+                              updateChildOrder,refreshChildOrder,addChild,markSuccess,markFailure,deleteUnit],
+                addClasses:["unitContainer","notSelectable"],
+                addDataStore:[
+                    [e.CONTROLLED_OBJECT,null],
+                    [e.NAME,null],
+                    [e.ORDER,Number.POSITIVE_INFINITY],
+                    [e.CONTENTS,Set],
+                    [e.CONTENTS_ORDER,Array],
+                    [e.CHILD_CONTAINER,null],
+                ],
+                onCreationCode:function(mainDiv,options){
+                    const {controlledObject} = options;
+                    this.save(e.CONTROLLED_OBJECT,controlledObject);
+                    this.save(e.NAME,controlledObject.name);
+                    this.save(e.CHILD_CONTAINER,this.querySelector("section.childContainer"));
+                    UniqueSelection.addMember(Verification,this);
+                }
+
+            });
+
+                //Buttons
                 ElementTemplates.baseAdditionButton = new ElementTemplate({
                     mainElement:ElementTemplates.genericControllingButton,
                     addClasses:"unitAdditionButton",
@@ -2241,7 +2632,6 @@ var UIManager = (function () {
                             let createdBlock =  this.elder['phaseContainer'].load(e.CONTROLLED_OBJECT).newBlock();
                             let createdBlockHtml = FacadeMap.getHtml(createdBlock);
                             createdBlockHtml.save(e.ORDER,order-0.5);
-                            this.elder['phaseContainer'].func.refreshChildOrder();
                         });
                     }
                 })
@@ -2251,46 +2641,58 @@ var UIManager = (function () {
                     onCompletionCode:function(mainDiv,options){
                         this.addEventListener("click",()=>{
                             let order = this.elder['gameContainer']?.load(e.ORDER) ?? Number.POSITIVE_INFINITY;
-                            let createdBlock =  this.elder['blockContainer'].load(e.CONTROLLED_OBJECT).newGame();
-                            let createdBlockHtml = FacadeMap.getHtml(createdBlock);
-                            createdBlockHtml.save(e.ORDER,order-0.5);
-                            this.elder['blockContainer'].func.refreshChildOrder();
+                            let createdGame =  this.elder['blockContainer'].load(e.CONTROLLED_OBJECT).newGame();
+                            let createdGameHtml = FacadeMap.getHtml(createdGame);
+                            createdGameHtml.save(e.ORDER,order-0.5);
                         });
                     }
                 })
+                //Unit Containers
                     EventTemplates.gameSelection = new ElementTemplate.eventObjMaker({
-                        triggers:"click",
+                        triggers:["mouseup"],
                         queryselection:"section.childContainer",
                         func:function(ev){
-                            let currentlySelected = this.elder['bracketContainer'].load(e.SELECTED);
-                            let chosenGame = this.elder['gameContainer'].load(e.CONTROLLED_OBJECT);
-                            let sourceRank =( ev.button===0) ? 1:2;
-                            if(!currentlySelected || ev.altKey){
+                            const currentlySelected = this.elder['bracketContainer'].load(e.SELECTED);
+                            const chosenGameHtml = this.elder['gameContainer'];
+                            const chosenGame = chosenGameHtml.load(e.CONTROLLED_OBJECT);
+                            const sourceRank =( ev.button===0) ? 1:2;
+                            if(currentlySelected===chosenGame) return false;
+
+                            if((!currentlySelected || ev.altKey)){
+                                if(ev.button!==0) return false;
                                 this.elder['bracketContainer'].func.selectGame(chosenGame);
                                 return true;
                             } 
-
+                            const currentlySelectedHtml = FacadeMap.getHtml(currentlySelected);
                             if(!ev.ctrlKey){
                                 if(!ev.shiftKey){
-                                    
+                                    currentlySelectedHtml.func.createLink(e.BOTTOM_LINK,chosenGame,sourceRank)
                                 } else{
-                                    
+                                    currentlySelectedHtml.func.createLink(e.TOP_LINK,chosenGame,sourceRank)
                                 }
                             } else{
                                 if(!ev.shiftKey){
-                                    
+                                    chosenGameHtml.func.createLink(e.BOTTOM_LINK,currentlySelected,sourceRank)
                                 } else{
-
+                                    chosenGameHtml.func.createLink(e.TOP_LINK,currentlySelected,sourceRank)
                                 }
                             }
 
+                        }
+                    })
+                    EventTemplates.unitDeletion = new ElementTemplate.eventObjMaker({
+                        triggers:"click",
+                        queryselection:"span[data-button-function='delete']",
+                        func:function(ev){
+                            this.root.load(e.CONTROLLED_OBJECT).delete();
                         }
                     })
                     function refreshGameDisplay(){
                         let gameLabelGenFunc = UIManagerObject.gameLabelGenerationFunctions.selected;
                         let linkLabelGenFunc = UIManagerObject.linkLabelGenerationFunctions.selected;
                         this.load(e.CHILD_CONTAINER).replaceChildren();
-                        this.func.getGameDisplayIndex();
+                        this.func.getDisplayIndex();
+                        this.func.removeDeletedLinks();
                         this.load(e.CHILD_CONTAINER).append(gameLabelGenFunc(this.load(e.CONTROLLED_OBJECT)));
                         this.load(e.CHILD_CONTAINER).append(HTMLTemplates.linkLabel(e.TOP_LINK,linkLabelGenFunc(this.load(e.TOP_LINK))));
                         this.load(e.CHILD_CONTAINER).append(HTMLTemplates.linkLabel(e.BOTTOM_LINK,linkLabelGenFunc(this.load(e.BOTTOM_LINK))));
@@ -2300,6 +2702,19 @@ var UIManager = (function () {
                         this.save(e.GAME_ORDER,index);
                         return index
                     }
+                        UIManagerObject.blockLabelGenerationFunctions  = {
+                            select(func){
+                                this.selected=func;
+                            },
+                            simpleName(block){
+                                return block.name;
+                            },
+                            simpleOrder(block){
+                                return `B${FacadeMap.getHtml(block).load(e.ORDER)+1}`
+                            }
+                        }
+                        UIManagerObject.blockLabelGenerationFunctions.select(UIManagerObject.blockLabelGenerationFunctions.simpleOrder);
+
                         UIManagerObject.gameLabelGenerationFunctions  = {
                             select(func){
                                 this.selected=func;
@@ -2318,55 +2733,82 @@ var UIManager = (function () {
                                 this.selected=func;
                             },
                             plain(link){
-                                let ranking;
+                                let unitName,ranking;
                                 if(!link) return "No Link"
                                 if(link.source instanceof Game){
-                                    ranking = (link.sourceRank === 1) ? "W":"L"
+                                    ranking = (link.sourceRank === 1) ? "W":"L";
+                                    console.log(link)
+                                    unitName = `Game ${FacadeMap.getHtml(link.source).func.getDisplayIndex()+1}`
                                 }
                                 if(link.source instanceof Phase){
                                     ranking = String(link.sourceRank);
+                                    unitName = `[Phase] ${link.source.name}`
                                 }
-                                return `${link.source.name} (${ranking})`
+                                if(link.source instanceof Team){
+                                    ranking = "Team";
+                                    unitName =link.source.name;
+                                }
+                                return `${unitName} (${ranking})`
                             }
                         }
                         UIManagerObject.linkLabelGenerationFunctions.select(UIManagerObject.linkLabelGenerationFunctions.plain);
 
+                        UIManagerObject.unitNameGenerationFunction = function(unit){
+                            let name;
+                                if(unit instanceof Game){
+                                    name = `[${unit.phase.name}] ${UIManagerObject.gameLabelGenerationFunctions.selected(unit)} (${UIManagerObject.blockLabelGenerationFunctions.selected(unit.block)})`;
+                                }
+                                if(unit instanceof Block){
+                                    name = `[${unit.phase.name}] ${UIManagerObject.blockLabelGenerationFunctions.selected(unit)}`
+                                }
+                                if(unit instanceof Phase){
+                                    name = `${unit.name}`
+                                }
+                                return name;
+                        }
+
                     function resetLinkPosition(){
                         let incomingLinks = this.load(e.CONTROLLED_OBJECT)?.incomingLinks;
                         if(incomingLinks){
-                            if(incomingLinks.length===0){
-                                this.save(e.TOP_LINK,null)
-                                this.save(e.BOTTOM_LINK,null)
-                            }
-                            if(incomingLinks.length===1){
-                                this.save(e.TOP_LINK,null)
-                                this.save(e.BOTTOM_LINK,incomingLinks[0])
-                            }
-                            if(incomingLinks.length===2){
-                                this.save(e.TOP_LINK,incomingLinks[1])
-                                this.save(e.BOTTOM_LINK,incomingLinks[0])
-                            }
+                            this.func.assignLinkPosition(incomingLinks[0])
+                            this.func.assignLinkPosition(incomingLinks[1])
                         }
                     }
                     function assignLinkPosition(link){
-                        if(!this.load(e.BOTTOM_LINK)){ 
+                        const bottomLink =this.load(e.BOTTOM_LINK);
+                        const topLink = this.load(e.TOP_LINK);
+                        if(link ===bottomLink || link ===topLink) return false;
+                        if(!bottomLink){ 
                             this.save(e.BOTTOM_LINK,link);
-                        } else if(!this.load(e.TOP_LINK)) {
+                        } else if(!topLink) {
                             this.save(e.TOP_LINK,link)
-                        }       
+                        }
+                        this.save(e.CONTENTS,new Set([this.load(e.BOTTOM_LINK),this.load(e.TOP_LINK)]));
+                    }
+                    function removeDeletedLinks(){
+                        if(this.load(e.BOTTOM_LINK)?.forDeletion) this.save(e.BOTTOM_LINK,null)
+                        if(this.load(e.TOP_LINK)?.forDeletion) this.save(e.TOP_LINK,null)
+                        this.save(e.CONTENTS,new Set([this.load(e.BOTTOM_LINK),this.load(e.TOP_LINK)]));
+                    }
+                    function createLink(position,source,sourceRank){
+                        const currentLink = this.load(position);
+                        if(currentLink) currentLink.deleteLink();
+                        const newLink = new Link({source,sourceRank,target:this.load(e.CONTROLLED_OBJECT)});
+                        this.save(position,newLink);
                     }
                     EventTemplates.callLinkPopUp = ElementTemplate.eventObjMaker({
                         triggers:"click",
-                        queryselection:"button",
-                        func:function(){
-                            KeyNodes.popUp.linkCreation.func.openPopUp();
+                        queryselection:"button[data-button-function='edit']",
+                        func:function(ev){
+                            KeyNodes.popUp.linkCreation.func.openPopUp(this.root.load(e.CONTROLLED_OBJECT));
                         }
                     })
                 ElementTemplates.gameContainer = new ElementTemplate({
+                    label:"gameContainer",
                     mainElement:ElementTemplates.baseUnitContainer,
-                    htmlSmartInsert:{html:HTMLTemplates.labelledButton("Edit"),destination:"div.contentsDisplayArea"},
-                    addEvents:[EventTemplates.gameSelection,EventTemplates.callLinkPopUp],
-                    addFunctions:[[refreshGameDisplay,"refreshCosmetics"],resetLinkPosition,assignLinkPosition,getGameDisplayIndex],
+                    htmlSmartInsert:{html:HTMLTemplates.labelledButton("Edit","edit"),destination:"div.contentsDisplayArea"},
+                    addEvents:[EventTemplates.gameSelection,EventTemplates.unitDeletion,EventTemplates.callLinkPopUp],
+                    addFunctions:[[refreshGameDisplay,"refreshCosmetics"],resetLinkPosition,assignLinkPosition,[getGameDisplayIndex,"getDisplayIndex"],createLink,removeDeletedLinks],
                     addAsElder:"gameContainer",
                     addClasses:"gameContainer",
                     addDataStore:[
@@ -2376,87 +2818,113 @@ var UIManager = (function () {
                     ],
                     addTemplates:[
                         [ElementTemplates.gameAdditionButton,{parentElement:"div.anteChildrenDisplayArea"}],
+                        [ElementTemplates.genericControllingButton,{parentElement:"div.contentsDisplayArea",
+                                                                    templateOptions: {addClasses:"deleteButton",
+                                                                                      addDataset:[{name:"buttonFunction",value:"delete"}],
+                                                                                      buttonText:"Delete"}
+                                                                    }]
                     ],
                     onCompletionCode:function(mainDiv,options){
-                        this.load(e.CHILD_CONTAINER).append(this.load(e.CONTROLLED_OBJECT).name); //testing
                         this.func.resetLinkPosition();
+                        this.querySelector("section.childContainer").addEventListener("contextmenu",(ev)=>ev.preventDefault());
                     }
                 });
+                    function getBlockDisplayIndex(){
+                        this.elder['phaseContainer'].func.updateChildOrder();
+                        return this.load(e.ORDER);
+                    }
+                    function refreshBlockDisplay(){
+                        const blockLabelGenFunc = UIManagerObject.blockLabelGenerationFunctions.selected;
+                        const postChildrenDisplayArea$ = this.querySelector("div.blockContainer>div.postChildrenDisplayArea>span.displayLabel");
+                        postChildrenDisplayArea$.textContent = blockLabelGenFunc(this.load(e.CONTROLLED_OBJECT));
+                    }
                 ElementTemplates.blockContainer = new ElementTemplate({
                     mainElement:ElementTemplates.baseUnitContainer,
-                    addFunctions:[[()=>false,"refreshCosmetics"]],
+                    addFunctions:[[refreshBlockDisplay,"refreshCosmetics"],[getBlockDisplayIndex,"getDisplayIndex"]],
                     addAsElder:"blockContainer",
                     addClasses:"blockContainer",
+                    htmlSmartInsert:[{html:HTMLTemplates.simpleDisplayLabel("Block"),destination:"div.postChildrenDisplayArea"}],
                     addTemplates:[
                         [ElementTemplates.blockAdditionButton,{parentElement:"div.anteChildrenDisplayArea"}],
-                        [ElementTemplates.gameAdditionButton,{parentElement:"div.contentsDisplayArea"}]],
+                        [ElementTemplates.gameAdditionButton,{parentElement:"div.contentsDisplayArea"}],
+                        [ElementTemplates.genericControllingButton,{parentElement:"div.postChildrenDisplayArea",
+                                                                    templateOptions: {addClasses:"deleteButton",
+                                                                                      addDataset:[{name:"buttonFunction",value:"delete"}],
+                                                                                      buttonText:"Delete"}
+                                                                    }]],
+                    addEvents:[EventTemplates.unitDeletion],
+                        
                     onCompletionCode:function(mainDiv,options){
-                        mainDiv.append(this.load(e.CONTROLLED_OBJECT).name);
                     }
                 });
 
-                    EventTemplates.saveFormOnInputChange = ElementTemplate.eventObjMaker({
-                        triggers:"input",
-                        queryselection:"div[data-object-field='priority'] input",
-                        func:function(ev){
-                            this.elder["phaseLabel"].func.updateObject();
-                        }
-                    })
-                    EventTemplates.editPhasePopUp = ElementTemplate.eventObjMaker({
-                        triggers:'click',
-                        queryselection:"span[data-button-function='edit']",
-                        func:function(ev){
-                            KeyNodes.popUp.phaseEditor$.func.openPopUp();
-                            let form = KeyNodes.popUp.phaseEditor$.querySelector("form");
-                            form.func.editingMode(this.elder['phaseLabel'].load(e.CONTROLLED_OBJECT));
-                        }
-                    })
 
-                ElementTemplates.phaseContainerLabel = new ElementTemplate({
-                    mainElement:ElementTemplates.genericForm,
-                    addTemplates:[
-                        [ElementTemplates.genericControllingButton,{templateOptions:{addDataset:[{name:"buttonFunction",value:"edit"}],
-                                                                                     buttonText:"Edit"},
-                                                                    parentElement:"section.formControls"}],
-                    ],
-                    addEvents:[EventTemplates.saveFormOnInputChange,EventTemplates.editPhasePopUp],
-                    addAsElder:"phaseLabel",
-                    addClasses:"phaseContainerLabel",
-                    onCreationCode:function(mainDiv,options){
-                        mainDiv.func.addInputContainer(
-                            {
-                                objectField:"name",
-                                htmlContents: HTMLTemplates.simpleDisplayLabel("Phase Name Here"),
-                                harvest:Harvest.displayLabel,
-                                verify:()=>true,
-                                edit:()=>true,
-                                retrieve:Retreive.directProperty
-                            },
-                            {
-                                objectField:"phaseType",
-                                htmlContents: HTMLTemplates.simpleDisplayLabel("Phase Type Here"),
-                                harvest:Harvest.displayLabelSymbolConversion({[e.ROUND_ROBIN]:"Round Robin",[e.TOURNAMENT]:"Tournament"}),
-                                verify:()=>true,
-                                edit:()=>true,
-                                retrieve:Retreive.directProperty
-                            },
-                            {
-                                objectField:"priority",
-                                htmlContents:HTMLTemplates.smartStandardNumber("Priority"),
-                                harvest:Harvest.smartStandardNumber(0),
-                                verify:Verify.positiveInt,
-                                edit:Edit.newSettings,
-                                retrieve:Retreive.accessMap(["currentSettings"])
-                            },
-                        )
-                        this.func.importObject(this.elder["phaseContainer"].load(e.CONTROLLED_OBJECT));
-                        this.func.resetValues();
-                        CodeObserver.addHandler(this.elder['phaseContainer'].load(e.CONTROLLED_OBJECT),(obs,{keyword})=>{
-                            if(keyword===e.EDIT) mainDiv.func.resetValues();
+                        EventTemplates.saveFormOnInputChange = ElementTemplate.eventObjMaker({
+                            triggers:"input",
+                            queryselection:"div[data-object-field='priority'] input",
+                            func:function(ev){
+                                this.elder["phaseLabel"].func.updateObject();
+                            }
                         })
-                        oLog.pform = this;
-                    }
-                })
+                        EventTemplates.editPhasePopUp = ElementTemplate.eventObjMaker({
+                            triggers:'click',
+                            queryselection:"span[data-button-function='edit']",
+                            func:function(ev){
+                                KeyNodes.popUp.phaseEditor$.func.openPopUp();
+                                let form = KeyNodes.popUp.phaseEditor$.querySelector("form");
+                                form.func.editingMode(this.elder['phaseLabel'].load(e.CONTROLLED_OBJECT));
+                            }
+                        })
+                    ElementTemplates.phaseContainerLabel = new ElementTemplate({
+                        mainElement:ElementTemplates.genericForm,
+                        addTemplates:[
+                            [ElementTemplates.genericControllingButton,{templateOptions:{addDataset:[{name:"buttonFunction",value:"edit"}],
+                                                                                        buttonText:"Edit"},
+                                                                        parentElement:"section.formControls"}],
+                            [ElementTemplates.genericControllingButton,{parentElement:"section.formControls",
+                                                                        templateOptions: {addClasses:"deleteButton",
+                                                                                          addDataset:[{name:"buttonFunction",value:"delete"}],
+                                                                                          buttonText:"Delete"}
+                                                                        }]
+                        ],
+                        addEvents:[EventTemplates.saveFormOnInputChange,EventTemplates.editPhasePopUp,EventTemplates.unitDeletion],
+                        addAsElder:"phaseLabel",
+                        addClasses:"phaseContainerLabel",
+                        onCreationCode:function(mainDiv,options){
+                            mainDiv.func.addInputContainer(
+                                {
+                                    objectField:"name",
+                                    htmlContents: HTMLTemplates.simpleDisplayLabel("Phase Name Here"),
+                                    harvest:Harvest.displayLabel,
+                                    verify:()=>true,
+                                    edit:()=>true,
+                                    retrieve:Retreive.directProperty
+                                },
+                                {
+                                    objectField:"phaseType",
+                                    htmlContents: HTMLTemplates.simpleDisplayLabel("Phase Type Here"),
+                                    harvest:Harvest.displayLabelSymbolConversion({[e.ROUND_ROBIN]:"Round Robin",[e.TOURNAMENT]:"Tournament"}),
+                                    verify:()=>true,
+                                    edit:()=>true,
+                                    retrieve:Retreive.directProperty
+                                },
+                                {
+                                    objectField:"priority",
+                                    htmlContents:HTMLTemplates.smartStandardNumber("Priority"),
+                                    harvest:Harvest.smartStandardNumber(0),
+                                    verify:Verify.positiveInt,
+                                    edit:Edit.newSettings,
+                                    retrieve:Retreive.accessMap(["currentSettings"])
+                                },
+                            )
+                            this.func.importObject(this.elder["phaseContainer"].load(e.CONTROLLED_OBJECT));
+                            this.func.resetValues();
+                            CodeObserver.addHandler(this.elder['phaseContainer'].load(e.CONTROLLED_OBJECT),(obs,{keyword})=>{
+                                if(keyword===e.EDIT) mainDiv.func.resetValues();
+                            })
+                            oLog.pform = this;
+                        }
+                    })
                 ElementTemplates.phaseContainer = new ElementTemplate({
                     mainElement:ElementTemplates.baseUnitContainer,
                     addFunctions:[[()=>false,"refreshCosmetics"]],
@@ -2468,39 +2936,62 @@ var UIManager = (function () {
                     addAsElder:"phaseContainer",
                     addClasses:"phaseContainer"
                 });
-                function refreshBracketCosmetics(){
-                    const competitionNameLabel$ = this.querySelector("div.anteChildrenDisplayArea span");
-                    competitionNameLabel$.textContent=this.load(e.CONTROLLED_OBJECT).name;
+                    function refreshBracketCosmetics(){
+                        const competitionNameLabel$ = this.querySelector("div.anteChildrenDisplayArea span");
+                        competitionNameLabel$.textContent=this.load(e.CONTROLLED_OBJECT).name;
 
-                    const selectedGameDisplay$ = bracketSectionMenuContainer$.querySelector("span[data-display='selectedGame']");
-                    const selectedGame = this.load(e.SELECTED);
-                    if(selectedGame){
-                        selectedGameDisplay$.textContent = `Selected: ${selectedGame.name}`;
-                    } else {
-                        selectedGameDisplay$.textContent = `No Game Selected`;
-                    }
-                }
-                function selectGame(selectedGame){
-                    this.save(e.SELECTED,selectedGame);
-                    this.func.refreshCosmetics();
-                }
-                function updateAllGameOrder(){
-                    let allGamesOrder = this.load(e.GAME_ORDER);
-                    allGamesOrder.length=0;
-                    this.func.updateChildOrder();
-                    for(const phase of this.load(e.CONTENTS_ORDER)){
-                        const phaseHtml = FacadeMap.getHtml(phase);
-                        phaseHtml.func.updateChildOrder();
-                        for(const block of phaseHtml.load(e.CONTENTS_ORDER)){
-                            const blockHtml = FacadeMap.getHtml(block)
-                            blockHtml.func.updateChildOrder();
-                            allGamesOrder.push(...blockHtml.load(e.CONTENTS_ORDER));
+                        const selectedGameDisplay$ = bracketSectionMenuContainer$.querySelector("span[data-display='selectedGame']") ??( Break("Not found",{}));
+                        
+                        const selectedGame = this.load(e.SELECTED);
+                        if(selectedGame){
+                            selectedGameDisplay$.textContent = `Selected: ${selectedGame.name}`;
+                        } else {
+                            selectedGameDisplay$.textContent = `No Game Selected`;
                         }
                     }
-                }
+                    function selectGame(selectedGame){
+                        this.save(e.SELECTED,selectedGame);
+                        this.func.refreshCosmetics();
+                        CodeObserver.Execution({mark:Verification,currentFunction:Verification.activate,keyword:e.VERIFICATION});
+                    }
+                    function selectNextGame(forwards=true){
+                        const currentlySelectedGame = this.load(e.SELECTED);
+                        const gameOrder = this.load(e.GAME_ORDER);
+                        let newIndex;
+                        if(currentlySelectedGame){
+                            const currentIndex = gameOrder.indexOf(currentlySelectedGame);
+                            newIndex = currentIndex + ((forwards) ? 1:-1); 
+                            if(newIndex >= gameOrder.length) newIndex = newIndex - gameOrder.length;
+                        } else {
+                            newIndex = 0;
+                        }
+                        const nextGame = gameOrder[newIndex];
+                        if(nextGame) this.func.selectGame(nextGame);
+                    }
+                    function updateAllGameOrder(){
+                        let allGamesOrder = this.load(e.GAME_ORDER);
+                        allGamesOrder.length=0;
+                        this.func.updateChildOrder();
+                        for(const phase of this.load(e.CONTENTS_ORDER)){
+                            const phaseHtml = FacadeMap.getHtml(phase);
+                            phaseHtml.func.updateChildOrder();
+                            for(const block of phaseHtml.load(e.CONTENTS_ORDER)){
+                                const blockHtml = FacadeMap.getHtml(block)
+                                blockHtml.func.updateChildOrder();
+                                allGamesOrder.push(...blockHtml.load(e.CONTENTS_ORDER));
+                            }
+                        }
+                    }
+                    function debuggingMode(active){
+                        if(active){
+                            this.classList.add("debuggingVisible");
+                        } else {
+                            this.classList.remove("debuggingVisible");
+                        }
+                    }
                 ElementTemplates.bracketContainer = new ElementTemplate({
                     mainElement:ElementTemplates.baseUnitContainer,
-                    addFunctions:[[refreshBracketCosmetics,"refreshCosmetics"],selectGame,updateAllGameOrder],
+                    addFunctions:[[refreshBracketCosmetics,"refreshCosmetics"],selectGame,selectNextGame,updateAllGameOrder,debuggingMode],
                     htmlSmartInsert:{html:parseHTML(`Creating Bracket For: <span> </span>`),destination:"div.anteChildrenDisplayArea"},
                     addDataStore:[
                         [e.SELECTED,null],
@@ -2510,28 +3001,35 @@ var UIManager = (function () {
                     addClasses:"bracketContainer",
                     onCompletionCode: function(mainDiv,options){
                         this.func.refreshCosmetics();
+                        UniqueSelection.deleteMember(Verification,this);
                         CodeObserver.addHandler(this.load(e.CONTROLLED_OBJECT),(observer,{keyword,currentObject})=>{
                             if(keyword!==e.EDIT) return;
                             mainDiv.func.refreshCosmetics();
-                        })
+                        });
+                        KeyNodes.unitContainers.bracketContainer = this;
                     }
                 });
+                }
 
                 linkCreationPopUp:{
-                        function selectLinkSource(winner,linkSource){
-                            if(winner){
-                                console.log("Chosen Link",linkSource.name,1)
-                            } else {
-                                console.log("Chosen Link",linkSource.name,2)
-                            }
+                        function selectLinkSource(sourceRank,linkSource){
+                            this.elder["linkCreationArea"].save(e.SOURCE,linkSource);
+                            this.elder["linkCreationArea"].save(e.SOURCE_RANK,sourceRank);
+                            this.elder["linkCreationArea"].func.setInputValues(linkSource,sourceRank)
                         }
                         function primaryMasterSelectAction(htmlElem,ev){
-                            const selected = UniqueSelection.toggle(htmlElem.elder["panel"],htmlElem.elder['entry'],false,["primarySelection"]);
-                            if(selected) htmlElem.elder['entry'].func.selectLinkSource(true,htmlElem.elder['entry'].load(e.CONTROLLED_OBJECT))
+                            const entryObject = htmlElem.elder['entry'].load(e.CONTROLLED_OBJECT)
+                            if(entryObject instanceof Division || entryObject instanceof Block) return false
+                            UniqueSelection.wipeClasses(htmlElem.elder["panel"],["secondarySelection"]);
+                            UniqueSelection.select(htmlElem.elder["panel"],htmlElem.elder['entry'],false,["primarySelection"]);
+                            htmlElem.elder['entry'].func.selectLinkSource(1,entryObject)
                         }
                         function secondaryMasterSelectAction(htmlElem,ev){
-                            const selected = UniqueSelection.toggle(htmlElem.elder["panel"],htmlElem.elder['entry'],false,["secondarySelection"]);
-                            if(selected) htmlElem.elder['entry'].func.selectLinkSource(false,htmlElem.elder['entry'].load(e.CONTROLLED_OBJECT));
+                            const entryObject = htmlElem.elder['entry'].load(e.CONTROLLED_OBJECT)
+                            if(entryObject instanceof Division || entryObject instanceof Block) return false
+                            UniqueSelection.wipeClasses(htmlElem.elder["panel"],["primarySelection"]);
+                            UniqueSelection.select(htmlElem.elder["panel"],htmlElem.elder['entry'],false,["secondarySelection"]);
+                            htmlElem.elder['entry'].func.selectLinkSource(2,entryObject);
                         }
                         let  masterFunctionSet=[
                             {callBack:(htmlElem,ev)=>primaryMasterSelectAction(htmlElem,ev),timing:{startTime:0,endTime:600}},
@@ -2543,22 +3041,22 @@ var UIManager = (function () {
                         onCreationCode:function(mainLi,options){
                             let objectLabel$=this.querySelector('span[data-selectable]');
                             let controlledObject = this.load(e.CONTROLLED_OBJECT);
-                            if(controlledObject instanceof Team || controlledObject instanceof Division || controlledObject instanceof Phase || controlledObject instanceof Block){
+                            if(controlledObject instanceof Team || controlledObject instanceof Division || controlledObject instanceof Phase){
                                 objectLabel$.prepend(controlledObject.name);
-                            } else if (controlledObject instanceof Game){
-                                let gameOrder = FacadeMap.getHtml(controlledObject).func.getGameDisplayIndex()+1;
-                                objectLabel$.prepend(`Game ${gameOrder}`)
+                            } else if (controlledObject instanceof Game || controlledObject instanceof Block){
+                                let gameOrder = FacadeMap.getHtml(controlledObject).func.getDisplayIndex()+1;
+                                objectLabel$.prepend(`${(controlledObject instanceof Game)?"Game":"Block"} ${gameOrder}`)
                             } 
                                 ExclusiveLongClickTimer( mainLi,masterFunctionSet)
                                 mainLi.addEventListener("pointerup",(ev)=>{
                                     if(ev.button!==2) return;
                                     secondaryMasterSelectAction(objectLabel$,ev);
                                 })
-        
+                                //Delete Edit Button
+                                this.querySelector("span:has(button[data-button-function='edit'])").remove();
                         }
                     });
                         function addGameNavigationEntry(newEntryObject,newEntryLocation$){
-                            console.log("added")
                             let newLi$= document.createElement("li");
                              newEntryLocation$.append(ElementTemplates.gameNavigationEntry.build(this,{useAsMainDiv:newLi$,newEntryObject}))
                             UniqueSelection.addMember(this.elder["panel"],newLi$);
@@ -2572,7 +3070,25 @@ var UIManager = (function () {
                             let entryList$=mainDiv.querySelector("ul");
                             let currentObject = this.elder["panel"].load(e.CURRENTLY_OPEN);
                             let entryArray = funcToObtainArray(currentObject[propertyName] ?? currentObject);
-
+                            if(entryArray && entryArray.length>0){
+                                if(entryArray[0] instanceof Game || entryArray[0] instanceof Block){
+                                    entryArray.sort((a,b)=>{
+                                        const aIndex = FacadeMap.getHtml(a).func.getDisplayIndex() 
+                                        const bIndex = FacadeMap.getHtml(b).func.getDisplayIndex() 
+                                        return aIndex - bIndex;
+                                    });
+                                } else if(entryArray[0] instanceof Phase){
+                                        entryArray.sort();
+                                        entryArray.sort((a,b)=>{
+                                            const aPriority = a.currentSettings.get(e.PRIORITY.description);
+                                            const bPriority = b.currentSettings.get(e.PRIORITY.description);
+                                            return aPriority - bPriority;
+                                        });
+                                    } else {
+                                        entryArray.sort();
+                                    }
+                                
+                            }
                             for(const newEntryObject of entryArray){
                                 this.func.addNavigationEntry(newEntryObject,entryList$);
                             }
@@ -2706,35 +3222,315 @@ var UIManager = (function () {
                                 }
                                 return sectionParameters
                         }
+                        function defaultView(){
+                            const currentSource = this.elder['linkCreationArea'].load(e.CONTROLLED_OBJECT)?.source;
+                            let currentSourceRank =  this.elder['linkCreationArea'].load(e.CONTROLLED_OBJECT)?.sourceRank;
+                            if(currentSourceRank ==="Team") currentSourceRank = 1;
+                            this.func.wipeDisplays();
+                            this.func.openObject(Phase,0);
+
+                            if(currentSource){
+                                if(currentSource instanceof Phase){
+                                    //go with default
+                                }else if(currentSource instanceof Team){
+                                    this.func.openObject(Team);
+                                } else {
+                                    this.func.openObject(currentSource.phase)
+                                    this.func.openObject(currentSource.block)
+                                }
+                                this.func.selectEntry(currentSource,(currentSourceRank===1) ? true:false);
+                                this.elder["linkCreationArea"].func.setInputValues(currentSource,currentSourceRank)
+                            } else {
+                                const currentUnit = this.elder['linkCreationPopUp'].load(e.CONTROLLED_OBJECT);
+                                const blockOrder = currentUnit.block.blockOrder;
+                                if(currentUnit.phase.currentSettings.get(e.PHASE_TYPE.description)===e.ROUND_ROBIN){
+                                    this.func.openObject(Team,0);
+                                } else {
+                                    if(blockOrder===1){
+                                        //go with default: this.func.openObject(Phase,0);
+                                    } else {
+                                        this.func.openObject(currentUnit.phase)
+                                        this.func.openObject(currentUnit.phase.allBlocksArray[blockOrder-2])
+                                    }
+                                }
+                            }
+                            this.elder['linkCreationArea'].save(e.EDIT,false);
+                        }
+                        function selectEntry(desiredControlledObject,primarySelection){
+                            const entries = this.querySelectorAll(".navigationEntry");
+                            for(const entry of entries){
+                                if(entry.load(e.CONTROLLED_OBJECT)===desiredControlledObject){
+                                    if(primarySelection){
+                                        primaryMasterSelectAction(entry);
+                                    } else {
+                                        secondaryMasterSelectAction(entry);
+                                    }
+                                }
+                            }
+                        }
+                        function correctCurrentLocationDisplay(){
+                            let currentLocationDisplay$= this.querySelector("div.navigationCurrentLocation");
+                            let currentObject = this.load(e.CURRENTLY_OPEN);
+                            let correctedName;
+                            if(currentObject instanceof Phase || currentObject instanceof Team){
+                                correctedName = currentObject.name;
+                            }
+                            if(currentObject instanceof Block || currentObject instanceof Game){
+                                correctedName = `${currentObject.constructor.name} ${FacadeMap.getHtml(currentObject).func.getDisplayIndex()+1}`
+                            }
+                            let appendText =(currentObject.constructor===Function) ? `All ${currentObject.name}s`:`${correctedName} [${currentObject.constructor.name}]`;
+                            currentLocationDisplay$.textContent=appendText;
+                        }
                     ElementTemplates.gameNavigationPanel = new ElementTemplate({
+                        label:"gameNavigationPanel",
                         mainElement:ElementTemplates.genericNavigationPanel,
                         htmlInsert: HTMLTemplates.gameNavigationPanel,
-                        addFunctions:[[getGameSectionParameters,"getSectionParameters"]],
+                        serialFunctions:[{newFunction:correctCurrentLocationDisplay,oldFunctionName:"refreshAppearance"}],
+                        addFunctions:[[getGameSectionParameters,"getSectionParameters"],defaultView,selectEntry],
                         onCompletionCode: function(mainDiv,options){
-                            this.save(e.NAVIGATION_SECTION_TEMPLATE,ElementTemplates.gameNavigationSection)
-                            
+                            this.save(e.NAVIGATION_SECTION_TEMPLATE,ElementTemplates.gameNavigationSection);
                         }
+                    });
+                        EventTemplates.detectEditing = ElementTemplate.eventObjMaker({
+                            triggers:"input", //attached to form, detects change in number input
+                            func:function(ev){
+                                let value = parseInt(ev.target.value);
+                                this.save(e.EDIT,true);
+                                this.save(e.SOURCE_RANK,value);
+                            }
+                        })
+                        function setInputValues(sourceUnit,sourceRank){
+                            this.querySelector("[data-object-field='sourceLabel'] input").value = this.func.generateUnitLabel(sourceUnit);
+                            const sourceRankInput= this.querySelector("[data-object-field='sourceRank'] input");
+                            sourceRankInput.value = (typeof sourceRank==="string") ? 1: sourceRank;
+                            if(sourceUnit instanceof Team) {
+                                sourceRankInput.parentElement.classList.add("invisible");
+                                sourceRankInput.setAttribute("readonly",true)
+                            } else {
+                                sourceRankInput.parentElement.classList.remove("invisible");
+                                sourceRankInput.removeAttribute("readonly")
+                            }
+                            this.save(e.SOURCE,sourceUnit);
+                            this.save(e.SOURCE_RANK,sourceRank)
+                            this.save(e.EDIT,true);
+                        }
+                        function generateUnitLabel(unit){
+                            let label;
+                                if(unit instanceof Phase) label = `[Phase] ${unit.name}`;
+                                if(unit instanceof Game) label = `Game ${FacadeMap.getHtml(unit).func.getDisplayIndex()+1}` ;
+                                if(unit instanceof Team) label = `[Team] ${unit.name}`;
+                            return label;
+                        }
+                        function createLink(){
+                            if(!this.load(e.EDIT)) return false;
+                            const currentIdentity = this.load(e.IDENTITY);
+                            const currentGame = this.elder['linkCreationPopUp'].load(e.CONTROLLED_OBJECT);
 
-                    })
-                    ElementTemplates.linkCreationPopUp = new ElementTemplate({
-                        mainElement:ElementTemplates.popUpBase,
+                            const newSource = this.load(e.SOURCE);
+                            const newSourceRank = this.load(e.SOURCE_RANK);
+                            FacadeMap.getHtml(currentGame).func.createLink(currentIdentity,newSource,newSourceRank);
+                        }
+                        function getRelevantLink(){
+                            const unit = this.root.load(e.CONTROLLED_OBJECT);
+                            const identity = this.load(e.IDENTITY);
+                            const relevantLink = FacadeMap.getHtml(unit)?.load(identity)
+                            this.save(e.CONTROLLED_OBJECT,relevantLink);
+                            return relevantLink;
+                        }
+                    ElementTemplates.linkCreationArea = new ElementTemplate({
+                        addAsElder:"linkCreationArea",
+                        mainElement:ElementTemplates.genericForm,
+                        addFunctions:[setInputValues,generateUnitLabel,createLink,getRelevantLink],
+                        addEvents:[EventTemplates.detectEditing],
+                        addDataStore:[
+                            [e.IDENTITY,null],
+                            [e.EDIT,false],
+                            [e.SOURCE,null],
+                            [e.SOURCE_RANK,null]
+                        ],
                         addTemplates:[
                             [ElementTemplates.gameNavigationPanel,{
-                                templateOptions:{identity:e.MASTER,useAsMainDiv:document.createElement("nav")},
-                                parentElement:"section.popUpContentContainer"}],
-                            [ElementTemplates.gameNavigationPanel,{
-                                    templateOptions:{identity:e.MASTER,useAsMainDiv:document.createElement("nav")},
-                                    parentElement:"section.popUpContentContainer"}],
-                        ]
+                                templateOptions:{identity:e.MASTER,useAsMainDiv:"nav"}
+                                }
+                            ]],
+                        onCreationCode:function(mainDiv,options){
+                            const {identity} = options;
+                            
+                            this.save(e.IDENTITY,identity);
+                            this.func.getRelevantLink();
+                            this.func.addInputContainer(
+                                {
+                                    objectField:"sourceLabel",
+                                    htmlContents:HTMLTemplates.smartStandardText("Source"),
+                                    verify:()=>true,
+                                    harvest:Harvest.smartStandardTextInput("No Link Exists"),
+                                    edit:()=>false,
+                                    retrieve:function(controlledObject,objectField){
+                                        return this.elder['linkCreationArea'].func.generateUnitLabel(controlledObject.source);
+                                    },
+                                },
+                                {
+                                    objectField:"sourceRank",
+                                    htmlContents:HTMLTemplates.smartStandardNumber("Source Rank"),
+                                    verify:Verify.positiveInt,
+                                    harvest:Harvest.smartStandardNumber(1),
+                                    retrieve:function(controlledObject,objectField){
+                                       return controlledObject.sourceRank;
+                                    },
+                                }
+                                );
+                            this.querySelector("[data-object-field='sourceLabel'] input").setAttribute("readonly",true)
+                        },
+                        onCompletionCode:function(mainDiv,options){
+                            
+                        }
+                    })
+                        function setControlledGame(openPopUpReturn,newGame){
+                            this.save(e.CONTROLLED_OBJECT,newGame)
+                        }
+                        function resetLinkCreationAppearance(){
+                            const forms = this.querySelectorAll("form");
+                            const navigators = this.querySelectorAll("nav");
+                            for(const form of forms){
+                                form.func.getRelevantLink();
+                                form.func.resetValues();
+                            }
+                            for(const navigator of navigators){
+                                navigator.func.defaultView();
+                            }
+                        }
+                        EventTemplates.newLink = ElementTemplate.eventObjMaker({
+                            triggers:"click",
+                            queryselection:"button[data-button-function='save']",
+                            func:function(ev){
+                                this.root.load(e.TOP_LINK).func.createLink();
+                                this.root.load(e.BOTTOM_LINK).func.createLink();
+                                this.root.func.closePopUp();
+                            }
+                        });
+                        EventTemplates.resetLinks = ElementTemplate.eventObjMaker({
+                            triggers:"click",
+                            queryselection:"button[data-button-function='reset']",
+                            func: function(ev){
+                                this.root.func.resetLinkCreationAppearance()
+                            }
+                        });
+                        EventTemplates.closeLinkPopUp = ElementTemplate.eventObjMaker({
+                            triggers:"click",
+                            queryselection:"button[data-button-function='cancel']",
+                            func: function(ev){
+                                this.root.func.closePopUp();
+                            }
+                        });
+                    ElementTemplates.linkCreationPopUp = new ElementTemplate({
+                        addAsElder:"linkCreationPopUp",
+                        addEvents:[EventTemplates.newLink,EventTemplates.resetLinks,EventTemplates.closeLinkPopUp],
+                        serialFunctions:[
+                            {oldFunctionName:"openPopUp",newFunction:setControlledGame},
+                            {oldFunctionName:"openPopUp",newFunction:resetLinkCreationAppearance},
+                        ],
+                        addFunctions:[resetLinkCreationAppearance],
+                        mainElement:ElementTemplates.popUpBase,
+                        htmlSmartInsert:{html:HTMLTemplates.buttonPanel([{label:"Ok",role:"save"},{label:"Reset",role:"reset"},{label:"Cancel",role:"cancel"}]),
+                                        destination:"menu.popUpWindow"},
+                        addDataStore:[
+                            [e.CONTROLLED_OBJECT,null],
+                            [e.TOP_LINK,null],
+                            [e.BOTTOM_LINK,null]
+                        ],
+                        addTemplates:[
+                            [ElementTemplates.linkCreationArea,{
+                                templateOptions:{identity:e.TOP_LINK},
+                                parentElement:"section.popUpContentContainer",
+                                saveAs:e.TOP_LINK}],
+                            [ElementTemplates.linkCreationArea,{
+                                templateOptions:{identity:e.BOTTOM_LINK},
+                                parentElement:"section.popUpContentContainer",
+                                saveAs:e.BOTTOM_LINK}]
+                        ],
+                        onCompletionCode:function(){
 
+                        }
                     })
                     
                     KeyNodes.popUp.linkCreation = ElementTemplates.linkCreationPopUp.build(null)
+                }
+
+                autoGeneratePopUp:{
+                    ElementTemplates.simpleTeamSelectionForm = new ElementTemplate({
+                        mainElement: ElementTemplates.genericForm,
+                        onCompletionCode: function(mainDiv,options){
+                            this.func.addInputContainer(
+                                {
+                                    objectField:"supportTeams",
+                                    htmlContents:ElementTemplates.displayTeamSelection.build,
+                                    verify:(value)=>{
+                                        if(!(value instanceof Set)) return false;
+                                        let flag = true; 
+                                        value.forEach(teamOrDiv=>{
+                                            if(!(teamOrDiv instanceof Team) && !(teamOrDiv instanceof Division)) flag=false;
+                                        })
+                                        return flag; 
+                                    },
+                                    retrieve:Retreive.accessMap(["currentSettings"]),
+                                    harvest:(inputContainer,{insertValue,reset})=>inputContainer.firstElementChild.func.harvest({insertValue,reset}),
+                                    edit:Edit.newSettings
+                                }
+                            )
+                        }
+                    });
+
+                        EventTemplates.initiateRoundRobin = ElementTemplate.eventObjMaker({
+                            triggers:"click",
+                            queryselection:"button[data-button-function='roundRobin']",
+                            func:function(ev){
+                               const dataArray=Array.from( this.root.load(e.ROUND_ROBIN).func.harvestData().values());
+                               const teamDivSet = dataArray[0];
+                               const teamSet = new Set();
+                               for(const teamDiv of teamDivSet){
+                                if(teamDiv instanceof Team) teamSet.add(teamDiv);
+                                if(teamDiv instanceof Division){
+                                    teamDiv.allTeams.forEach(x=>teamSet.add(x));
+                                }
+                               }
+                               AutoBracket.generate(AutoBracket.roundRobin,{phaseName:"New Round Robin",allowFailure:true,allowDuplicates:true,limitSetSize:true},Array.from(teamSet));
+                            }
+                        })
+                    ElementTemplates.autoBracketPopUp = new ElementTemplate({
+                        mainElement:ElementTemplates.popUpBase,
+                        addAsElder:"autoBracketPopUp",
+                        addEvents:[EventTemplates.closePopUp,EventTemplates.initiateRoundRobin],
+                        serialFunctions:[
+                        ],
+                        htmlSmartInsert:[{html:HTMLTemplates.buttonPanel([{label:"Round-Robin",role:"roundRobin"}]),
+                                        destination:"section.popUpContentContainer"},
+                        {html:HTMLTemplates.buttonPanel([{label:"Close",role:"close"}]),
+                                        destination:"menu.popUpWindow"},
+                                    ],
+                        addDataStore:[
+                            [e.CONTROLLED_OBJECT,null],
+                            [e.ROUND_ROBIN,null],
+                        ],
+                        addTemplates:[
+                            [ElementTemplates.simpleTeamSelectionForm,{destination:"section.popUpContentContainer",saveAs:e.ROUND_ROBIN}]
+                        ],
+                        onCompletionCode:function(){
+
+                        }
+                    });
+                    KeyNodes.popUp.autoBracket = ElementTemplates.autoBracketPopUp.build(null)
                 }
             
             }
             setUp:{
                 function unitCreationHtmlHandler(observer,observation){
+                    const {mark,newObject} = observation;
+                    if(observer!==CodeObserver.Creation) return false;
+                    if(mark===Link) return false;
+                    const {html,parentHtml} = FacadeMap.createHtmlWrapper(newObject);
+                    return true;
+                }
+                function unitCreationAppendingHandler(observer,observation){
                     const {mark,newObject} = observation;
                     if(observer!==CodeObserver.Creation) return false;
                     if(mark===Link){
@@ -2743,13 +3539,6 @@ var UIManager = (function () {
                         targetHtml.func.refreshCosmetics(); 
                         return true; 
                     }
-                    const {html,parentHtml} = FacadeMap.createHtmlWrapper(newObject);
-                    return true;
-                }
-                function unitCreationAppendingHandler(observer,observation){
-                    const {mark,newObject} = observation;
-                    if(observer!==CodeObserver.Creation) return false;
-                    if(mark===Link) return false //code to update relavent game here later. 
                     const unitHtml = FacadeMap.getHtml(newObject);
                     if(!unitHtml.root){
                         bracketSection$.append(unitHtml);
@@ -2757,20 +3546,747 @@ var UIManager = (function () {
                         unitHtml.root.func.addChild(newObject);
                         unitHtml.root.func.refreshChildOrder();
                     }
-                    if(newObject instanceof Game){
+                    if(newObject instanceof Game || newObject instanceof Block){
                         unitHtml.elder['bracketContainer'].func.updateAllGameOrder();
                         unitHtml.elder['bracketContainer'].func.requestChildrenRefreshCosmetics();
                         
                     }
                 }
+                function unitDeletionHandler(observer,observation){
+                    if(observer!==CodeObserver.Deletion) return false
+                    const {mark,deletedObject} = observation;
+                    const deletedHtml = FacadeMap.getHtml(deletedObject);
+                    deletedHtml.func.deleteUnit();
+                }
+
+                function changeValidityHandler(observer,observation){
+                    const {keyword,mark}=observation;
+                    if(observer !== CodeObserver.Execution || keyword!==e.VERIFICATION) return false; 
+                    
+                    const validityTracker = mark.validity;
+                    if(!validityTracker.status){
+                        console.log(UIManagerObject.unitNameGenerationFunction(mark),validityTracker.message)
+                        FacadeMap.getHtml(mark).func.markFailure();
+                    } else {
+                        FacadeMap.getHtml(mark).func.markSuccess();
+                    }
+                }
+                function verificationRunHandler(observer,observation){
+                    const {mark,keyword} =observation;
+                    if(mark!==Verification || keyword!==e.VERIFICATION) return false;
+                    const objectionsSet = Verification.objections; 
+                    const selectedGame = KeyNodes.unitContainers.bracketContainer.load(e.SELECTED);
+                    UniqueSelection.wipeClasses(Verification,[e.ALL]);
+
+                    for(const objection of objectionsSet){
+                        const visibleDebug = selectedGame === objection.objector;
+                        for(const associatedLink of objection.associatedLinkList){
+                            const sourceHtml = FacadeMap.getHtml(associatedLink.source);
+                            const targetHtml =FacadeMap.getHtml(associatedLink.target);
+
+                            if(sourceHtml) UniqueSelection.select(Verification,sourceHtml,true,["verificationSource",(visibleDebug) ? "debuggingVisible":null])
+                            if(targetHtml) UniqueSelection.select(Verification,targetHtml,true,["verificationTarget",(visibleDebug) ? "debuggingVisible":null])
+                        }
+                        const primeSuspectHtml = FacadeMap.getHtml(objection.primeSuspect);
+                        if(primeSuspectHtml) UniqueSelection.select(Verification,primeSuspectHtml,true,["verificationSuspect",(visibleDebug) ? "debuggingVisible":null]);
+                    }
+                }
+
+                function selectNextGameHandler(ev){
+                    if(ev.key==="1" && ev.altKey===true && ev.repeat===false){
+                        KeyNodes.unitContainers.bracketContainer.func.selectNextGame();
+                        ev.preventDefault();
+                    }
+                }
+
                 CodeObserver.addToHandlerGroup(e.CREATE,[unitCreationHtmlHandler],false);
                 CodeObserver.addToHandlerGroup(e.CREATE,[unitCreationAppendingHandler],true);
+                CodeObserver.addToHandlerGroup(e.DELETE,[unitDeletionHandler],false);
+                CodeObserver.registerHandlerGroup(e.VERIFICATION);  
+                CodeObserver.addToHandlerGroup(e.VERIFICATION,[changeValidityHandler],false);
+
+                CodeObserver.addHandler(Verification,verificationRunHandler);
+
+                bracketSection$.setAttribute("tabIndex",0);
+                bracketSection$.addEventListener("keydown",selectNextGameHandler);
                 // CodeObserver.addToHandlerGroup(e.CREATE,[(o,obs)=>console.log(obs.mark.name,"async")],true);
                 // CodeObserver.addToHandlerGroup(e.CREATE,[(o,obs)=>console.log(obs.mark.name)],false);
             } 
         }
     }
+    scheduleSection:{
+        const ScheduleSettings={
+            getSettings(){Break("Must be overridden in menu section")},
+            calendar: null,//overidden when calendar created
+            getNameFromLink(link){
+                if(!link) return "None"
+                let name;
+                if(link.source instanceof Team){
+                    name = link.source.name
+                }
+                if(link.source instanceof Game){
+                    name = `${KeyNodes.FacadeMap.getHtml(timeSlot.scheduledItem).load(e.NAME)} (${(teamReference.sourceRank===1) ? "W":"L"})`
+                }
+                return name;
+            },
+            getRestrictions(){Break("Must be overriden in restrictionPopUp section")}
+        };
+        oLog.scheduleSettings = ScheduleSettings;
 
+        function runAndDisplaySchedule(){
+            let restrictions = ScheduleSettings.getRestrictions();
+            let scheduler=new Scheduler(Competition.current,ScheduleSettings.getSettings().get('fieldNumber'),ScheduleSettings.getSettings().get('startDateObject').getTime(),{restrictions})
+            scheduler.scheduleAll();
+            let simpleFieldSchedule = scheduler.getFieldSchedule();
+            let supportScheduler = new SupportScheduler(Competition.current,simpleFieldSchedule)
+            let completeFieldSchedule = supportScheduler.getCompleteSchedule();
+            ScheduleSettings.calendar.func.processFieldSchedule(completeFieldSchedule);
+            console.log(completeFieldSchedule);
+        }
+        menu:{
+            const schedulingMenuForm$ = ElementTemplates.genericForm.build(null,{useAsMainDiv:"menu"});
+            schedulingSectionMenuContainer$.append(schedulingMenuForm$);
+            schedulingMenuForm$.init.addClasses("schedulingSectionMenuContainer")
+            schedulingMenuForm$.func.addInputContainer(
+                {
+                objectField:"fieldNumber",
+                verify:Verify.positiveInt,
+                harvest:Harvest.smartStandardNumber(1),
+                retrieve:()=>1,
+                edit:()=>true,
+                htmlContents: HTMLTemplates.smartStandardNumber("Fields:",1)
+                },
+                {
+                objectField:"scheduleIncrement",
+                verify:Verify.positiveInt,
+                harvest:Harvest.smartStandardNumber(15),
+                retrieve:()=>1,
+                edit:()=>true,
+                htmlContents: HTMLTemplates.smartStandardNumber("Time Increment:",15)
+                },
+                {
+                objectField:"startDate",
+                verify:Verify.positiveInt,
+                harvest:Harvest.smartStandardTextInput(`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,0)}-${String(new Date().getDate()).padStart(2,0)}`),
+                retrieve:()=>1,
+                edit:()=>true,
+                htmlContents: HTMLTemplates.smartStandardDate("Comp Date:")
+                },
+                {
+                objectField:"startTime",
+                verify:Verify.positiveInt,
+                harvest:Harvest.smartStandardTextInput("08:00"),
+                retrieve:()=>1,
+                edit:()=>true,
+                htmlContents: HTMLTemplates.smartStandardTime("Comp Time:")
+                },
+            )
+
+            schedulingMenuForm$.func.addFormControls(
+                {html:HTMLTemplates.labelledButton("Schedule"),
+                controlFunction:"startScheduling",
+                func:()=>{runAndDisplaySchedule()}},
+
+                {html:HTMLTemplates.labelledButton("Restrictions"),
+                controlFunction:"editRestrictions",
+                func:()=>{KeyNodes.popUp.restrictions.func.openPopUp()}}
+            )
+
+            ScheduleSettings.getSettings = function getSettings(){
+                schedulingMenuForm$.func.harvestData();
+                const scheduleInfo = schedulingMenuForm$.func.getHarvestDataMappedByObjectField();
+                const startDateObject = getUTCDateFromStrings(scheduleInfo.get("startDate"),scheduleInfo.get("startTime"));
+                startDateObject.setSeconds(0,0);
+                scheduleInfo.set("startDateObject",startDateObject)
+                return scheduleInfo
+            }
+            
+        }
+        restrictionsPopUp:{
+            const restrictionsPopUp = ElementTemplates.popUpBase.build(null,{});
+            const restrictionDisplay = ElementTemplates.genericDisplayBoard.build(restrictionsPopUp,{
+                displayTypes:[{
+                displayType:"name",
+                textFunc:(x)=>x.restrictionName,
+                smartHtml:{html:HTMLTemplates.actionButtonFactory("X",function(ev){
+                                                this.root.func.deleteDisplayItem();
+                                                this.elder['displayBoard'].func.deleteRestrictionObject(this.root.load(e.DISPLAY).restrictionName)})}
+                }]
+            });
+            const restrictionForm = ElementTemplates.genericForm.build(restrictionsPopUp,{controlledObjectConstructor:Object});
+                    oLog.restrictionDisplay = restrictionDisplay;
+                    KeyNodes.popUp.restrictions = restrictionsPopUp;
+
+            //Settings getRestrictions
+            ScheduleSettings.getRestrictions = function(){
+                const formattedRestrictions =[];
+                const restrictionObjects = restrictionsPopUp.load(e.RESTRICTIONS);
+                for(const [restrictionName,restrictionObject] of restrictionObjects){
+                    console.log(restrictionObject);
+                    let startField = restrictionObject.startField;
+                    if(restrictionObject.firstField || restrictionObject.allFields) startField =0;
+                    
+                    let endField = restrictionObject.endField;
+                    if(restrictionObject.lastField || restrictionObject.allFields) endField =0;
+
+                    let startTime;
+                    let endTime;
+                    let length;
+                    let compStartDate = ScheduleSettings.getSettings().get("startDateObject");
+                    if(restrictionObject.timeChoice ==="objective"){
+                        startTime = getUTCDateFromStrings(restrictionObject.startDate,restrictionObject.startTime).getTime();
+                        endTime = getUTCDateFromStrings(restrictionObject.startDate,restrictionObject.startTime).getTime();
+                        length = endTime-startTime;
+                    }
+                    if(restrictionObject.timeChoice ==="relativeDay"){
+                        let compStartOfDayTime = getUTCDayBoundary(compStartDate.getTime()).dayStart;
+                        startTime = compStartOfDayTime + 
+                                    (restrictionObject.startDay-1)*d.DAY_MS +
+                                    getMsFromTimeString(restrictionObject.startTime);
+                        endTime = compStartOfDayTime + 
+                                    (restrictionObject.endDay-1)*d.DAY_MS +
+                                    getMsFromTimeString(restrictionObject.endTime);
+                        length = endTime-startTime;
+                    }
+                    if(restrictionObject.timeChoice ==="relativeTime"){
+                        let compStartTime = compStartDate.getTime();
+                        startTime = compStartTime + 
+                                    (restrictionObject.startDay-1)*d.DAY_MS +
+                                    (restrictionObject.startHour)*d.HOUR_MS +
+                                    (restrictionObject.startMinute)*d.MINUTE_MS;
+                        endTime = compStartTime + 
+                                    (restrictionObject.endDay-1)*d.DAY_MS +
+                                    (restrictionObject.endHour)*d.HOUR_MS +
+                                    (restrictionObject.endMinute)*d.MINUTE_MS;
+                        length = endTime-startTime;
+                    }
+                    console.log(new Date(startTime),new Date(endTime),length)
+
+                    const formattedRestriction = {
+                        name: restrictionObject.restrictionName,
+                        description:"None",
+                        startField:startField,
+                        endField:endField,
+                        type:e.FIELD_CLOSURE,
+                        startTime,
+                        length
+                    }
+                    
+                    formattedRestrictions.push(formattedRestriction);
+                }
+                return formattedRestrictions;
+            }
+            //Popup Set-up
+            restrictionsPopUp.init.addDataStore([e.RESTRICTIONS,Map]);
+            restrictionsPopUp.init.addDataStore([e.DISPLAY,restrictionDisplay]);
+            restrictionsPopUp.init.addDataStore([e.FORM,restrictionForm]);
+            restrictionsPopUp.init.htmlSmartInsert(
+            {html:()=>HTMLTemplates.buttonPanel([{label:"Close",role:"close",func:function(ev){this.elder["popupbase"].func.closePopUp()}}]),
+            destination:"menu.popUpWindow",
+            });
+            
+            restrictionsPopUp.func.addContent(restrictionForm);
+            restrictionsPopUp.func.addContent(restrictionDisplay);
+            //Form set-up
+            restrictionForm.func.addInputSection("basicDetails","timeChoice","timeDetails");
+            UniqueSelection.addGroup(e.DISPLAY);
+            UniqueSelection.addFamily(e.DISPLAY,[],"relativeDay");//aliases correspond to radio button values for type of time selection
+            UniqueSelection.addFamily(e.DISPLAY,[],"relativeTime");
+            UniqueSelection.addFamily(e.DISPLAY,[],"objective");
+
+            function newRestrictionObject(harvestedDataAsMap){
+                let restrictionObject={};
+                for(let [fieldName,data] of harvestedDataAsMap){
+                    restrictionObject[fieldName]=data;
+                }
+                this.elder['popupbase'].load(e.RESTRICTIONS).set(restrictionObject.restrictionName,restrictionObject);
+                this.elder['popupbase'].load(e.DISPLAY).func.clearDisplay();
+                for(const [name,obj] of this.elder['popupbase'].load(e.RESTRICTIONS)){
+                    let displayItem = this.elder['popupbase'].load(e.DISPLAY).func.addDisplayItem(obj);
+                displayItem.firstChild.addEventListener("click",function(){
+                    this.elder['popupbase'].load(e.FORM).func.editingMode(this.root.load(e.DISPLAY));
+                    UniqueSelection.select(e.DISPLAY,restrictionObject.timeChoice)
+                });
+                }
+            }
+            function deleteRestrictionObject(name){
+                this.elder['popupbase'].load(e.RESTRICTIONS).delete(name);
+                console.log(restrictionsPopUp.load(e.RESTRICTIONS));
+            }
+            function viewDefaultTimeChoice(){
+                UniqueSelection.select(e.DISPLAY,"relativeDay");
+            }
+            restrictionForm.init.addFunctions(newRestrictionObject);
+
+            restrictionDisplay.init.addFunctions(deleteRestrictionObject);
+
+            restrictionForm.func.addInputContainer(
+                    {
+                    objectField:"restrictionName",
+                    verify:function(value){
+                     return   (value === this.func.retrieve() ||
+                        !restrictionsPopUp.load(e.RESTRICTIONS).has(value))},
+                    harvest:Harvest.smartStandardTextInput("New Restriction"),
+                    retrieve:Retreive.directProperty,
+                    edit:Edit.directProperty,
+                    htmlContents: HTMLTemplates.smartStandardText("Name: "),
+                    destination:"section.basicDetails",
+                    },
+                    {
+                    objectField:"allFields",
+                    verify:Verify.boolean,
+                    harvest:Harvest.fireChangeSingleCheckbox,
+                    retrieve:Retreive.directProperty,
+                    edit:Edit.directProperty,
+                    htmlContents: HTMLTemplates.smartStandardSingleCheckbox("All Fields"),
+                    destination:"section.basicDetails",
+                    addEvents:[{triggers:["change","progChange"],func:function(ev){
+                        let checked = this.func.harvest();
+                    if(checked) this.elder['form'].querySelectorAll("section.basicDetails div:not([data-object-field=allFields]) input")?.forEach(x=>{if(x.getAttribute("disabled")!=='true')x.setAttribute("disabled",false)});
+                    else this.elder['form'].querySelectorAll("section.basicDetails input")?.forEach(x=>{if(x.getAttribute("disabled")==='false') x.removeAttribute("disabled")});
+                    }}]
+                    },
+                    {
+                    objectField:"firstField",
+                    verify:Verify.boolean,
+                    harvest:Harvest.fireChangeSingleCheckbox,
+                    retrieve:Retreive.directProperty,
+                    edit:Edit.directProperty,
+                    htmlContents: HTMLTemplates.smartStandardSingleCheckbox("First Field"),
+                    destination:"section.basicDetails",
+                    addEvents:[{triggers:["change","progChange"],func:function(ev){
+                        let checked = this.func.harvest();
+                    if(checked) this.elder['form'].querySelector("[data-object-field='startField'] input")?.setAttribute("disabled",true);
+                    else this.elder['form'].querySelector("[data-object-field='startField'] input")?.removeAttribute("disabled");
+                    }}]
+                    },
+                    {
+                    objectField:"startField",
+                    verify:Verify.positiveInt,
+                    harvest:Harvest.smartStandardNumber(1),
+                    retrieve:Retreive.directProperty,
+                    edit:Edit.directProperty,
+                    htmlContents: HTMLTemplates.smartStandardNumber("Start Field:",1),
+                    destination:"section.basicDetails"
+                    },
+                    {
+                    objectField:"lastField",
+                    verify:Verify.boolean,
+                    harvest:Harvest.fireChangeSingleCheckbox,
+                    retrieve:Retreive.directProperty,
+                    edit:Edit.directProperty,
+                    htmlContents: HTMLTemplates.smartStandardSingleCheckbox("Last Field"),
+                    destination:"section.basicDetails",
+                    addEvents:[{triggers:["change","progChange"],func:function(ev){
+                        let checked = this.func.harvest();
+                       if(checked) this.elder['form'].querySelector("[data-object-field='endField'] input")?.setAttribute("disabled",true);
+                       else this.elder['form'].querySelector("[data-object-field='endField'] input")?.removeAttribute("disabled");
+                    }}]
+                    },
+                    {
+                    objectField:"endField",
+                    verify:Verify.positiveInt,
+                    harvest:Harvest.smartStandardNumber(1),
+                    retrieve:Retreive.directProperty,
+                    edit:Edit.directProperty,
+                    htmlContents: HTMLTemplates.smartStandardNumber("End Field:",1),
+                    destination:"section.basicDetails"
+                    },
+                    {
+                    objectField:"timeChoice",
+                    verify:()=>true,
+                    harvest:Harvest.radioButtons,
+                    retrieve:Retreive.directProperty,
+                    edit:Edit.directProperty,
+                    htmlContents: HTMLTemplates.smartRadioButtons("timeChoice",
+                    {value:"relativeDay",label:"Relative to First Day of Competition"},
+                    {value:"relativeTime",label:"Relative to Competition Start Time"},
+                    {value:"objective",label:"Choose Date / Time"},
+                    ),
+                    addEvents:{triggers:"change",queryselection:"input[type='radio']",func:function(){
+                        UniqueSelection.select(e.DISPLAY,this.value);
+                    }},
+                    destination:"section.timeChoice"
+                    },
+                    {
+                    objectField:"startDate",
+                    verify:()=>true,
+                    harvest:Harvest.smartStandardDate(),
+                    retrieve:Retreive.directProperty,
+                    edit:Edit.directProperty,
+                    htmlContents: HTMLTemplates.smartStandardDate("Start Date:"),
+                    uniqueSelectionFamily:{familyAlias:["objective"],groupName:e.DISPLAY},
+                    destination:"section.timeDetails"
+                    },
+                    {
+                    objectField:"startDay",
+                    verify:()=>true,
+                    harvest:Harvest.smartStandardNumber(1),
+                    retrieve:Retreive.directProperty,
+                    edit:Edit.directProperty,
+                    htmlContents: HTMLTemplates.smartStandardNumber("Start Day:"),
+                    uniqueSelectionFamily:{familyAlias:["relativeDay","relativeTime"],groupName:e.DISPLAY},
+                    destination:"section.timeDetails"
+                    },
+                    {
+                    objectField:"startHour",
+                    verify:()=>true,
+                    harvest:Harvest.smartStandardNumber(1),
+                    retrieve:Retreive.directProperty,
+                    edit:Edit.directProperty,
+                    htmlContents: HTMLTemplates.smartStandardNumber("Start Hour:"),
+                    uniqueSelectionFamily:{familyAlias:["relativeTime"],groupName:e.DISPLAY},
+                    destination:"section.timeDetails"
+                    },
+                    {
+                    objectField:"startMin",
+                    verify:()=>true,
+                    harvest:Harvest.smartStandardNumber(1),
+                    retrieve:Retreive.directProperty,
+                    edit:Edit.directProperty,
+                    htmlContents: HTMLTemplates.smartStandardNumber("Start Minute:"),
+                    uniqueSelectionFamily:{familyAlias:["relativeTime"],groupName:e.DISPLAY},
+                    destination:"section.timeDetails"
+                    },
+                    {
+                    objectField:"startTime",
+                    verify:()=>true,
+                    harvest:Harvest.smartStandardTime(8,0),
+                    retrieve:Retreive.directProperty,
+                    edit:Edit.directProperty,
+                    htmlContents: HTMLTemplates.smartStandardTime("Start Time:"),
+                    uniqueSelectionFamily:{familyAlias:["relativeDay","objective"],groupName:e.DISPLAY},
+                    destination:"section.timeDetails"
+                    },
+                    {
+                    objectField:"endDate",
+                    verify:()=>true,
+                    harvest:Harvest.smartStandardDate(),
+                    retrieve:Retreive.directProperty,
+                    edit:Edit.directProperty,
+                    htmlContents: HTMLTemplates.smartStandardDate("End Date:"),
+                    uniqueSelectionFamily:{familyAlias:["objective"],groupName:e.DISPLAY},
+                    destination:"section.timeDetails"
+                    },
+                    {
+                    objectField:"endDay",
+                    verify:()=>true,
+                    harvest:Harvest.smartStandardNumber(1),
+                    retrieve:Retreive.directProperty,
+                    edit:Edit.directProperty,
+                    htmlContents: HTMLTemplates.smartStandardNumber("End Day:"),
+                    uniqueSelectionFamily:{familyAlias:["relativeDay","relativeTime"],groupName:e.DISPLAY},
+                    destination:"section.timeDetails"
+                    },
+                    {
+                    objectField:"endHour",
+                    verify:()=>true,
+                    harvest:Harvest.smartStandardNumber(1),
+                    retrieve:Retreive.directProperty,
+                    edit:Edit.directProperty,
+                    htmlContents: HTMLTemplates.smartStandardNumber("End Hour:"),
+                    uniqueSelectionFamily:{familyAlias:["relativeTime"],groupName:e.DISPLAY},
+                    destination:"section.timeDetails"
+                    },
+                    {
+                    objectField:"endMin",
+                    verify:()=>true,
+                    harvest:Harvest.smartStandardNumber(1),
+                    retrieve:Retreive.directProperty,
+                    edit:Edit.directProperty,
+                    htmlContents: HTMLTemplates.smartStandardNumber("End Minute:"),
+                    uniqueSelectionFamily:{familyAlias:["relativeTime"],groupName:e.DISPLAY},
+                    destination:"section.timeDetails"
+                    },
+                    {
+                    objectField:"endTime",
+                    verify:()=>true,
+                    harvest:Harvest.smartStandardTime(10,0),
+                    retrieve:Retreive.directProperty,
+                    edit:Edit.directProperty,
+                    htmlContents: HTMLTemplates.smartStandardTime("End Time:"),
+                    uniqueSelectionFamily:{familyAlias:["relativeDay","objective"],groupName:e.DISPLAY},
+                    destination:"section.timeDetails"
+                    },
+
+            )
+            restrictionForm.func.addFormControls(
+                {
+                    html: HTMLTemplates.labelledButton("Create","newRestriction"),
+                    func: function(){
+                        this.elder['form'].func.harvestData();
+                        if(this.elder['form'].func.verifyHarvestedData()){
+                            let dataMapByField = this.elder['form'].func.getHarvestDataMappedByObjectField();
+                            this.elder['form'].func.newRestrictionObject(dataMapByField);
+                        }
+                    },
+                    uniqueSelectionFamily: {familyAliases:[e.CREATE],groupName:restrictionForm},
+                    classes:"hiddenByDefault"
+                },
+                {
+                    html: HTMLTemplates.labelledButton("Edit","editRestricion"),
+                    func: function(){
+                        if(this.elder['form'].func.updateObject()){
+                        this.elder['popupbase'].load(e.DISPLAY).func.refreshAllText();
+                        this.elder['form'].func.resetValues(true);
+                        this.elder['form'].func.switchMode(e.CREATE);
+                        viewDefaultTimeChoice()}
+                    },
+                    uniqueSelectionFamily: {familyAliases:[e.EDIT],groupName:restrictionForm},
+                    classes:"hiddenByDefault"
+                },
+                {
+                    html: HTMLTemplates.labelledButton("Cancel","resetValueEntry"),
+                    func: function(){
+                        this.elder['form'].func.resetValues(true);
+                        this.elder['form'].func.switchMode(e.CREATE);
+                        viewDefaultTimeChoice()
+                        
+                    },
+                    uniqueSelectionFamily: {familyAliases:[e.CREATE,e.EDIT],groupName:restrictionForm},
+                    classes:"hiddenByDefault"
+                },
+            )
+
+            let newHeading =HTMLAdditions.hideByDefault(HTMLTemplates.smartHeading("New Restriction"));
+            let [newHeadingInserted] = restrictionForm.init.htmlSmartInsert({html:newHeading,insertionMethod:Element.prototype.prepend})
+            UniqueSelection.expandFamily(restrictionForm,e.CREATE,newHeadingInserted);
+            let editHeading =HTMLAdditions.hideByDefault(HTMLTemplates.smartHeading("Edit Restriction"));
+            let [editHeadingInserted] = restrictionForm.init.htmlSmartInsert({html:editHeading,insertionMethod:Element.prototype.prepend})
+            UniqueSelection.expandFamily(restrictionForm,e.EDIT,editHeadingInserted);
+
+            let timeDetailInputs = restrictionForm.querySelectorAll("section.timeDetails>.inputContainer");
+            timeDetailInputs.forEach(x=>x.classList.add("hiddenByDefault"));
+            
+            restrictionForm.func.switchMode(e.CREATE);
+            UniqueSelection.select(e.DISPLAY,"relativeDay");
+
+            
+            
+            
+
+        }
+        scheduleTable:{
+            ElementTemplates.calendarControls = new ElementTemplate({
+                mainElement: ElementTemplates.genericForm,
+                htmlInsert:"Controls",
+                addDataStore:[
+                   
+                ],
+                onCompletionCode: function(mainDiv,options){
+                   
+
+                }
+            });
+            function createTable(){
+                const table = document.createElement("table");
+                const rowContainer = table;
+                return {table,rowContainer}
+            }
+            function createRow(rowTime,increment,fieldNumber,rowContainer){
+                const rowDate = new Date(rowTime);
+                const tr = document.createElement("tr");
+                const timeCell = document.createElement("td");
+                tr.append(timeCell);
+                timeCell.append(`${String(rowDate.getUTCHours()).padStart(2,"0")}:${String(rowDate.getUTCMinutes()).padStart(2,"0")}`);
+                const rowReference = {startTime:rowTime,endTime:rowTime+increment-1,timeCell,htmlRow:tr,fieldCell:{},empty:true}
+
+                for(let i=1;i<=fieldNumber;i++){
+                    let fieldCell = document.createElement("td");
+                    tr.append(fieldCell);
+                    rowReference.fieldCell[i]=fieldCell;
+                }
+
+                rowContainer.append(tr);
+                return rowReference;
+            }
+            function createCaps(table,fieldNumber){
+                let headingRow = document.createElement("tr");
+                let timeHeading = document.createElement("th");
+                timeHeading.append("Time");
+                headingRow.append(timeHeading);
+                for(let i=1;i<=fieldNumber;i++){
+                    let fieldHeading = document.createElement("th");
+                    fieldHeading.append(`Field ${i}`);
+                    headingRow.append(fieldHeading);
+                }
+                table.prepend(headingRow);
+            }
+            function createCalendarGrid(fieldNumber=2){
+                 const increment =   this.load(e.INCREMENT) 
+                 const startTime = this.load(e.START_TIME)
+                 const setPointForToday = this.load(e.SET_POINT) + startTime;
+                 const endTime=   this.load(e.END_TIME)
+                 let rowTimes =[];
+
+                 const {table,rowContainer} = this.func.createTable();
+                
+                 for(let currentTime=setPointForToday;currentTime<endTime;currentTime= currentTime+increment){
+                     rowTimes.push(currentTime);
+                    }
+                 for(let currentTime=setPointForToday-increment;currentTime>=startTime;currentTime= currentTime-increment){
+                     rowTimes.unshift(currentTime)
+                 }
+                 
+                 for(const rowTime of rowTimes){
+                    const adjustedIncrement = ((rowTime+increment)>endTime) ? endTime-rowTime:increment;
+                    const rowReference= this.func.createRow(rowTime,adjustedIncrement,fieldNumber,rowContainer);
+                    this.load(e.CELL_TIME).set(rowReference,rowReference);
+                    UniqueSelection.addMember(this,rowReference.htmlRow);
+                 }
+
+                //  this.func.createCaps(rowContainer)
+                 this.replaceChildren();
+                 this.save(e.CONTENTS,table);
+                 this.append(table);    
+            }
+            function fillCalendarGrid(withinDaySet){
+                for(let timeSlot of withinDaySet){
+                    let appropriateRow = this.load(e.CELL_TIME).findOverlap(timeSlot.absoluteStartTime).items[0];
+                    let cellText;
+                    if(timeSlot.type === e.GAME_SLOT){
+
+                        let teamNames =[];
+                        for(let inLink of timeSlot.scheduledItem.incomingLinks){
+                            teamNames.push(ScheduleSettings.getNameFromLink(inLink))
+                        }
+                        cellText = `${KeyNodes.FacadeMap.getHtml(timeSlot.scheduledItem).load(e.NAME)}: ${teamNames[1]} vs. ${teamNames[0]}
+                        (Duty:${ScheduleSettings.getNameFromLink(timeSlot.supportRoles.get(SupportScheduler.DUTY))}) `;
+                    }
+                    if(timeSlot.type === e.FIELD_CLOSURE){
+                        cellText="Closed";
+                    }
+                    appropriateRow.fieldCell[timeSlot.fieldNumber].append(cellText);
+                    appropriateRow.empty=false;
+                }
+            }
+            function trimCalendarGrid(){
+                let cellTime = this.load(e.CELL_TIME);
+                let allRowEntries = cellTime.entries(true)
+                //from start
+                    for(let i=0;i<allRowEntries.length;i++){
+                        let rowReference = allRowEntries[i].item
+                        if(!rowReference.empty) break;
+                        UniqueSelection.select(this,rowReference.htmlRow,true,["hiddenByDefault"])
+                    }
+                //from end
+                for(let i=allRowEntries.length-1;i>=0;i--){
+                    let rowReference = allRowEntries[i].item
+                    if(!rowReference.empty) break;
+                    UniqueSelection.select(this,rowReference.htmlRow,true,["hiddenByDefault"])
+                }
+            }
+            ElementTemplates.calendarDayDisplay = new ElementTemplate({
+                addAsElder:"calendarDisplay",
+                addClasses:["calendarDisplay","hiddenByDefault"],
+                addDataStore:[
+                    [e.SET_POINT,null],
+                    [e.INCREMENT,null],
+                    [e.START_TIME,null],
+                    [e.END_TIME,null],
+                    [e.CONTENTS,null],
+                    [e.CELL_TIME,TimeMap]
+                ],
+                addFunctions:[createCalendarGrid,fillCalendarGrid,trimCalendarGrid,createRow,createTable,createCaps],
+                onCompletionCode: function(mainDiv,options){
+                    const {increment,setPoint,dayStart,dayEnd,dayOfComp,withinDaySet} = options;
+                    this.save(e.INCREMENT, increment)
+                    this.save(e.SET_POINT, setPoint)
+                    this.save(e.START_TIME, dayStart)
+                    this.save(e.END_TIME, dayEnd)
+                    let calendarDayButton = HTMLTemplates.actionButton(`D${dayOfComp} (${getHumanDate(dayStart)})`,()=>UniqueSelection.toggle(this.elder['calendar'],this));
+                    this.elder['calendar'].load(e.DAY_BUTTONS).append(calendarDayButton);
+                    UniqueSelection.addFamily(this.elder['calendar'],[this,calendarDayButton],this);
+                    UniqueSelection.addGroup(this,{alternateClasses:["hiddenByDefault"]});
+                    this.func.createCalendarGrid(this.elder['calendar'].load(e.FIELD_NUMEBER));
+                    this.func.fillCalendarGrid(withinDaySet);
+                    this.func.trimCalendarGrid();
+                    this.func.createCaps(this.load(e.CONTENTS),this.elder['calendar'].load(e.FIELD_NUMEBER));
+                }
+            });
+            function addCalendarDisplay(dayStart,withinDaySet,dayOfComp){
+                let dayEnd = dayStart + d.DAY_MS;
+                let newCalendarDisplay = ElementTemplates.calendarDayDisplay.build(this,{
+                    increment:this.func.getIncrement(),
+                    setPoint:this.func.getSetPoint(),
+                    dayStart,
+                    dayEnd,
+                    dayOfComp,
+                    withinDaySet
+                })
+                this.load(e.CONTENTS).add(newCalendarDisplay);
+                this.load(e.CHILD_CONTAINER).append(newCalendarDisplay);
+            }
+            function getIncrement(){
+                // this.load(e.CONTROLS).func.harvestData();
+                // let labelledData = this.load(e.CONTROLS).func.getHarvestDataMappedByObjectField();
+                // return labelledData.get("scheduleIncrement")*60*1000;
+                return ScheduleSettings.getSettings().get("scheduleIncrement")*60*1000;
+            }
+            function getSetPoint(){
+                let setPointTime = new Date(`1970-01-01T${ScheduleSettings.getSettings().get("startTime")}Z`).getTime();
+                return setPointTime;
+            }
+            function clearCalendarDisplay(){
+                this.load(e.CHILD_CONTAINER).replaceChildren();
+                this.load(e.DAY_BUTTONS).replaceChildren();
+                this.save(e.FIELD_SCHEDULE,null);
+                this.save(e.FIELD_NUMEBER,null);
+                this.save(e.CONTENTS,new Set());
+                UniqueSelection.deleteGroup(this);
+                UniqueSelection.addGroup(this);
+            }
+            
+            function processFieldSchedule(simpleFieldSchedule){
+                let fieldNumber = simpleFieldSchedule.length-1;
+                let dayMap = simpleFieldSchedule.dayMap;
+                this.func.clearCalendarDisplay();
+                this.save(e.FIELD_NUMEBER,fieldNumber);
+                this.save(e.FIELD_SCHEDULE,simpleFieldSchedule)
+                let sortedDayStarts = Array.from(dayMap.keys()).sort(SortFn.numAscending)
+                for(let i=0;i<sortedDayStarts.length;i++){
+                    let dayStart = sortedDayStarts[i];
+                    this.func.addCalendarDisplay(dayStart,dayMap.get(dayStart),i+1);
+                }
+                UniqueSelection.toggle(this,Array.from(this.load(e.CONTENTS))[0]);
+            }
+
+            ElementTemplates.calendar= new ElementTemplate({
+                addClasses:"calendar",
+                addAsElder:"calendar",
+                addFunctions:[getDayBoundary,getIncrement,clearCalendarDisplay,addCalendarDisplay,processFieldSchedule,getSetPoint],
+                htmlInsert: parseHTML(`
+                <section class='controlPanel'> CONTROL PANEL 
+                <nav class='daySelection'> DAYS </nav>
+                </section>
+                <section class='calendarDisplay'>CALENDERS</section>
+                `),
+                addDataStore:[
+                    [e.CONTROLS,null],
+                    [e.CONTENTS,Set],
+                    [e.CHILD_CONTAINER,null],
+                    [e.DAY_BUTTONS,null],
+                    [e.FIELD_SCHEDULE,null],
+                    [e.FIELD_NUMEBER,null],
+                ],
+                addTemplates:[
+                    [ElementTemplates.calendarControls,{destination:"section.controlPanel",saveAs:e.CONTROLS,prepend:true}]
+                ],
+                onCreationCode:function(mainDiv,options){
+                    this.save(e.CHILD_CONTAINER,mainDiv.querySelector("section.calendarDisplay"));
+                    this.save(e.DAY_BUTTONS,mainDiv.querySelector("section.controlPanel nav.daySelection"));
+                    this.func.clearCalendarDisplay();
+                    ScheduleSettings.calendar = this;
+                }
+            });
+        }
+        setup:{
+            const calendar$ = ElementTemplates.calendar.build(null,{});
+            schedulingDisplaySection$.append(calendar$);
+            oLog.calendar = calendar$;
+        }
+    }
 
     return UIManagerObject;
 })()
+ 

@@ -15,11 +15,14 @@ var Competition = (function () {
         this._terminalDistance = new Map();
         this._stageRecorder = new Map();
         this._pureStages = new Map();
+        let scheduler;
         defineGetter({ obj: this, name: "name", func: () => name });
         defineGetter({ obj: this, name: "id", func: () => myId });
         defineGetter({ obj: this, name: "currentSettings", func: () => mapToObjectArray(settings, "setting", "value") });
         defineGetter({ obj: this, name: "allPhasesArray", func: () => Array.from(phases) });
         defineGetter({ obj: this, name: "allGamesArray", func: () => this.allPhasesArray.reduce((acc,cv)=>{acc.push(...cv.allGamesInPhase);return acc;},[]) });
+        defineGetter({ obj: this, name: "scheduler", func: () => scheduler});
+        defineSetter({ obj: this, name: "scheduler", func: (newScheduler) => scheduler=newScheduler});
        
         this.updateSettings = function(newSettings){
             if(newSettings.name) name = newSettings.name
@@ -35,8 +38,7 @@ var Competition = (function () {
             if (!(phase instanceof Phase)) throw new Error("Not a phase");
             let phaseIndex; 
             if ((phaseIndex = phases.indexOf(phase)) === -1) throw new Error("No such phase in this Competetion");
-            phases.splice(phaseIndex);
-            if (phase.parent !== null) phase.removeParent();
+            phases.splice(phaseIndex,1);
         }
         this.getChildCount=function(unit){
             return this._terminalDistance.get(unit).size-1;

@@ -24,11 +24,16 @@
 
         this.setSupportRole = function(role,team){
             supportRoles.set(role,team);
-            console.log(role,team?.name??"Null")
+            // console.log(role,team?.name??"Null")
+        }
+        this.modifyTimes = function({newStartTime,newEndTime}){
+            if(Number.isInteger(newStartTime)) startTime = newStartTime;
+            if(Number.isInteger(newEndTime)) endTime = newEndTime;
         }
         scheduledGames.index.set(scheduledItem, this);
         scheduledGames.all.set(this, { startTime: this.startTime, endTime: this.endTime })
         field.set(this, { startTime: this.startTime, endTime: this.endTime });
+        scheduledGames.addToDayMap(this);
 
         return this;
     }
@@ -48,8 +53,9 @@
 
     // schedulerOptions{orderByBlock,orderByPriority,fieldLocations:{fieldNumber:[i,j]} }
     //useGamesInstead ~~ array/set of games to be used instead of all the games inside a comp. Useful for various calculations. 
-    function Scheduler(comp, maxFieldNumber, absoluteCompStartTime = Date.now(), {restrictions = [],schedulerOptions={},useGamesInsted}) {
+    function Scheduler(comp, maxFieldNumber, absoluteCompStartTime = Date.now(), {restrictions = [],schedulerOptions={},useGamesInsted=false}={}) {
         let me = this;
+        comp.scheduler = this;
         this._absoluteCompStartTime = parseInt(absoluteCompStartTime);
         this._comp=comp;
         this._schedulerOptions = schedulerOptions;
@@ -130,6 +136,9 @@
         this._scheduledGames = {
             index: new Map(),
             all: new TimeMap(),
+            dayMap: new Map(),
+            noGameDays: new Set(),
+            addToDayMap:this.addToDayMap.bind(this),
             fields: [],
             insert(game, fieldNumber, time) { return new GameSlot(game, fieldNumber, time) },
             closeField(restriction, fieldNumber) {return new ClosureSlot(restriction, fieldNumber) },
@@ -274,6 +283,40 @@
             this.assessAllGameReadiness();
             return newTimeSlot;
         },
+        addToDayMap(timeSlot){
+            let {timeSlotDayStart,timeSlotDayEnd}=getUTCDayBoundary(timeSlot.absoluteStartTime);
+                for(let i=0;i*d.DAY_MS+timeSlotDayStart<=timeSlotDayEnd;i++){
+                    let dayStart = i*d.DAY_MS+timeSlotDayStart
+                    if(!this._scheduledGames.dayMap.has(dayStart)){
+                        this._scheduledGames.dayMap.set(dayStart,new Set());
+                        this._scheduledGames.noGameDays.add(dayStart);
+                    }
+                    let withinDaySet = this._scheduledGames.dayMap.get(dayStart);
+                    withinDaySet.add(timeSlot);
+                    if(timeSlot.type===e.GAME_SLOT) this._scheduledGames.noGameDays.delete(dayStart);
+                }
+
+        },
+        tidyScheduledGames(){
+            for(let dayStart of this._scheduledGames.noGameDays){
+                let dayEnd = dayStart + d.DAY_MS;
+                let withinDaySet = this._scheduledGames.dayMap.get(dayStart);
+                    for(let timeSlot of withinDaySet){
+                        if(timeSlot.endTime<dayEnd){
+                            this._scheduledGames.index.delete(timeSlot.scheduledItem)
+                            timeSlot.field.delete(timeSlot);
+
+                        } else {
+                            if(timeSlot.startTime<dayEnd){
+                            timeSlot.modifyTimes({newStartTime:dayEnd});
+                            // timeSlot.field.set(timeSlot,{timeSlot});
+                        }
+                        }
+                    }
+                    this._scheduledGames.dayMap.delete(dayStart);
+
+            }
+        },
         scheduleAll() {
             comp.refreshTerminalDistance();
             console.time("Scheduling")
@@ -316,6 +359,7 @@
                 this.scheduleGame(choiceArray[0].game, choiceArray[0].fieldNumber, choiceArray[0].startTime);
             }
             console.timeEnd("Scheduling")
+            this.tidyScheduledGames();
             return success
         },
         serialScoring({ field, scoreFuncArray, rankingObject }) {
@@ -353,13 +397,13 @@
             simplifiedFieldSchedule.index=new Map();
             for (let i = 1; i < fields.length; i++) {
                 simplifiedFieldSchedule[i] = [];
-                let c = 0;
                 for (const timeSlot of fields[i]) {
                     simplifiedFieldSchedule[i].push(timeSlot)
                     simplifiedFieldSchedule.index.set(timeSlot.scheduledItem,timeSlot)
                 }
             }
             simplifiedFieldSchedule.phaseEndTimes = new Map(this._allPhases);
+            simplifiedFieldSchedule.dayMap = this._scheduledGames.dayMap;
             return simplifiedFieldSchedule
         },
 

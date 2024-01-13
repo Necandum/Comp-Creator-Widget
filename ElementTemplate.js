@@ -6,19 +6,27 @@ var ElementTemplate = (function () {
         
         this.build = function (root,options={useAsMainDiv:null,skipTemplate:false}) {
             let templateMainElement;
+            options = {...options};
             if(mainElement instanceof ElementTemplate){
                 let newOptions = {...options};
                 newOptions.skipTemplate = true;
+                delete options.useAsMainDiv;
                 templateMainElement = mainElement.build(root,newOptions);
             } else {
                 templateMainElement = (typeof mainElement ==="string") ? document.createElement(mainElement)
                                                                        : document.createElement("div");
             }
-
+            if(typeof options.useAsMainDiv ==="string"){
+                options.useAsMainDiv = document.createElement(options.useAsMainDiv);
+            }
+            if(typeof options.useAsMainDiv ==="function"){
+                options.useAsMainDiv = options.useAsMainDiv();
+            }
             const mainDiv = options.useAsMainDiv ?? templateMainElement;
             const elder = (mainDiv.elder) ? mainDiv.getActualElderObject()
                                         :(root) ? root.elder 
                                                 : {};
+                                                         
             let data = (root) ? root.getActualDataObject()
                               :(mainDiv.getActualDataObject) ? mainDiv.getActualDataObject()
                                                              : new Map();
@@ -52,13 +60,12 @@ var ElementTemplate = (function () {
             mainDiv.load = function quickLoad(dataStoreName) {
                 return localData.get(dataStoreName);
             }
-            mainDiv.init = {};
-
-            mainDiv.init.addAsElder=function(addAsElder,deletePriorRefrences){
-                if (addAsElder && elder[addAsElder]) Break("Cannot add two elders of same name", { args: arguments[0], addAsElder })
-                if(deletePriorRefrences){
-                    for(const elderReference in elder){
-                        if(elder[elderReference]===mainDiv) delete elder[elderReference]
+            mainDiv.init ??= {};
+           mainDiv.init.addAsElder=function(addAsElder,deletePriorRefrences){
+               if (addAsElder && elder[addAsElder]) Break("Cannot add two elders of same name", { args: arguments[0], addAsElder,elder,label})
+               if(deletePriorRefrences){
+                   for(const elderReference in elder){
+                       if(elder[elderReference]===mainDiv) delete elder[elderReference]
                     }
                 }
                 if (addAsElder) elder[addAsElder] = mainDiv;
@@ -81,9 +88,9 @@ var ElementTemplate = (function () {
             mainDiv.init.addFunctions(addFunctions);
 
             mainDiv.init.serialFunctions=function(oldFunctionName,newFunction){
-                Object.defineProperty(mainDiv,"func",{writable:true})
+                Object.defineProperty(mainDiv,"func",{writable:true});
 
-                let oldFunction = mainDiv.func[oldFunctionName]
+                let oldFunction = mainDiv.func[oldFunctionName] ?? (Break("Cannot find old function name"),{functions:mainDiv.func,oldFunctionName,newFunction});
                 newFunction = newFunction.bind(mainDiv);
 
                 mainDiv.func[oldFunctionName] =function combinedFunctions(){
@@ -135,43 +142,42 @@ var ElementTemplate = (function () {
                         }
                         mainDiv.append(htmlForInsertion);
                     }
-                }
-
-                for(const childNode of mainDiv.childNodes){
-                 addRootToChildNodes(mainDiv, elder, childNode);
+                    for(const childNode of mainDiv.childNodes){
+                        addRootToChildNodes(mainDiv, elder, childNode);
+                       }
                 }
             }
             mainDiv.init.htmlInsert(htmlInsert);
 
             mainDiv.init.htmlSmartInsert=function(...htmlInsertionObjects){
+                let insertedNodes =[];
                 for(const htmlInsertionObject of htmlInsertionObjects){
                     if(!htmlInsertionObject) continue;
-                    let {html,destination,insertionMethod}=htmlInsertionObject;
-                if (html) {
-                        let htmlForInsertion;
-                        if(typeof html ==="function"){
-                            htmlForInsertion = html(mainDiv,options);
-                        } else if (html instanceof HTMLElement || html instanceof Node){
-                            htmlForInsertion= html.cloneNode(true);
-                        } else if( typeof htmlInsertItem==='string'){
-                            htmlForInsertion = document.createTextNode(html)
-                        }
-                        else{
-                            Break("htmlInsert must be function or HTMLElement",{html,htmlInsertItem})
-                        }
-                        let targetedElement = mainDiv;
-                        if(destination){
-                            if(typeof destination ==='string') targetedElement = mainDiv.querySelector(destination) ?? targetedElement;
-                            if(destination instanceof Node || destination instanceof HTMLElement) targetedElement = (mainDiv.contains(destination)) ? destination: targetedElement;
-                        }
-                        let intendedInsertionMethod = insertionMethod ?? Element.prototype.append;
-                        intendedInsertionMethod.call(targetedElement,htmlForInsertion);
-                    }
+                    let {html,destination,insertionMethod,saveAs,noClone}=htmlInsertionObject;
+                    if (html) {
+                            let htmlForInsertion;
+                            if(typeof html ==="function"){
+                                htmlForInsertion = html(mainDiv,options);
+                            } else if (html instanceof HTMLElement || html instanceof Node){
+                                htmlForInsertion= noClone ? html:html.cloneNode(true);
+                            } else if( typeof html==='string'){
+                                htmlForInsertion = document.createTextNode(html)
+                            }
+                            else{
+                                Break("htmlInsert must be function or HTMLElement",{html,htmlInsertionObject})
+                            }
+                            let targetedElement = mainDiv;
+                            if(destination){
+                                if(typeof destination ==='string') targetedElement = mainDiv.querySelector(destination) ?? targetedElement;
+                                if(destination instanceof Node || destination instanceof HTMLElement) targetedElement = (mainDiv.contains(destination)) ? destination: targetedElement;
+                            }
+                            let intendedInsertionMethod = insertionMethod ?? Element.prototype.append;
+                            intendedInsertionMethod.call(targetedElement,htmlForInsertion);
+                            addRootToChildNodes(mainDiv, elder, htmlForInsertion);
+                            insertedNodes.push(htmlForInsertion)
+                        };
                 }
-
-                for(const childNode of mainDiv.childNodes){
-                 addRootToChildNodes(mainDiv, elder, childNode);
-                }
+                return insertedNodes;
             }
             if(htmlSmartInsert){
                 if(!Array.isArray(htmlSmartInsert)) htmlSmartInsert = [htmlSmartInsert];
@@ -190,11 +196,13 @@ var ElementTemplate = (function () {
                 if(addDataset===undefined) return false;
 
                 for (const newDataset of addDataset) {
-                    mainDiv.dataset[newDataset.name] = newDataset.value;
+                    const {name,value} = newDataset
+                    mainDiv.dataset[name] = value;
                 }
             }
             mainDiv.init.addDataset(addDataset);
 
+            
 
             mainDiv.init.addTemplates=function(addTemplates){ 
                 if(!addTemplates) return false;
@@ -202,44 +210,71 @@ var ElementTemplate = (function () {
                 let products =[];
                     for (let item of addTemplates) {
                         if(!Array.isArray(item)) item = [item]
-                        let [template,{templateOptions,parentElement,prepend}={}] = item;
+                        let [template,{templateOptions,parentElement,destination,prepend,saveAs}={}] = item;
+                        parentElement ??=destination;
                         if (!template instanceof ElementTemplate) Break("addTemplates must be array of ElementTemplators and option pairs", { addTemplates })
                         if(typeof parentElement ==="string") parentElement = mainDiv.querySelector(parentElement);
                         let producedElement = template.build(mainDiv,templateOptions)
                         products.push(producedElement);
                         (parentElement??mainDiv)[(prepend) ? "prepend":"append"](producedElement)
+                        if(saveAs) mainDiv.save(saveAs,producedElement);
                     }
                 return products
             }
             //delayed exec
-            mainDiv.init.addEvents=function(addEvents){
+            mainDiv.init.addEvents=function(addEvents){//newEvent = {querySelection,selfBackUp,optional,triggers:[],func,options}
+                if(!addEvents) return;
+                if(!Array.isArray(addEvents)) addEvents=[addEvents];
                 for (const newEvent of addEvents) {
                     if(!newEvent) continue;
+                    let {queryselection,selfBackUp=true,optional,triggers=["click"],func,options} = newEvent;
                     let elements;
-                   if (!newEvent.queryselection) {
+                   if (!queryselection) {
                        elements = [mainDiv]
                    } else {
-                       const queryResult = mainDiv.querySelectorAll(newEvent.queryselection);
+                       const queryResult = mainDiv.querySelectorAll(queryselection);
                        elements = (queryResult.length>0) ? Array.from(queryResult)
-                                                       : (newEvent.selfBackUp) ? [mainDiv]
-                                                                               : (newEvent.optional) ? []
+                                                       : (selfBackUp) ? [mainDiv]
+                                                                               : (optional) ? []
                                                                                                        : Break("Failed to find elements by query selection", { newEvent, addEvents, mainDiv, htmlInsert });
                    }
-                   for (const trigger of newEvent.triggers) {
+                   if(!Array.isArray(triggers)) triggers=[triggers];
+                   for (const trigger of triggers) {
                        for(const element of elements){
-                       element.addEventListener(trigger, newEvent.func, newEvent.options)
+                       element.addEventListener(trigger, func, options)
                        }
                    }
                }
             } //delayed exec
-
+            
             if (onCreationCode && typeof onCreationCode === "function") onCreationCode.call(mainDiv,mainDiv,options);
 
                 mainDiv.init.addTemplates(addTemplates);
 
                 mainDiv.init.addEvents(addEvents);
+            onCompletionCode:{
+                        const prevFunc = mainDiv.init.onCompletionCode;
+                        let currentFunc = null;
+                        if(onCompletionCode && typeof onCompletionCode === "function") currentFunc = onCompletionCode.bind(mainDiv);
 
-            if (onCompletionCode && typeof onCompletionCode === "function") onCompletionCode.call(mainDiv,mainDiv,options);
+                    if(prevFunc){
+                        let combinedFunc;
+                        if(currentFunc){
+                            combinedFunc = function combinedOnCompletionCode(mainDiv,options){
+                                prevFunc(mainDiv,options);
+                                currentFunc(mainDiv,options);
+                            }
+                        } else {
+                            combinedFunc = function combinedOnCompletionCode(){
+                                prevFunc(mainDiv,options);
+                            }
+                        }
+                        mainDiv.init.onCompletionCode = combinedFunc;
+                    } else if(currentFunc) {
+                        mainDiv.init.onCompletionCode = currentFunc;
+                    }
+                if(!options.skipTemplate) mainDiv.init.onCompletionCode?.(mainDiv,options);
+            }
 
             mainDiv.__label = label ?? addClasses?.toString() ?? addAsElder; //for debugging
             return mainDiv

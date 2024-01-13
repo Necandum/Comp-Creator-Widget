@@ -8,7 +8,9 @@
     <link rel="stylesheet" href="Styles/General Style.css">
     <link rel="stylesheet" href="Styles/Menus.css">
     <link rel="stylesheet" href="Styles/Competitor.css">
+    <link rel="stylesheet" href="Styles/Bracket.css">
     <link rel="stylesheet" href="Styles/Navigator.css">
+    <link rel="stylesheet" href="Styles/LinkCreationPopUp.css">
     <link rel="stylesheet" href="Styles/popUp.css">
     <link rel="stylesheet" href="Styles/InputContainers.css">
     <title>Document</title>
@@ -19,8 +21,8 @@
                 <nav id="configurationMenuContainer">
                     <ul id="configurationMenu">
                         <li > Competitor Set-up</li>
-                        <li class="toggleSelection"> Bracket Creation</li>
-                        <li> Scheduling</li>
+                        <li > Bracket Creation</li>
+                        <li class="toggleSelection"> Scheduling</li>
                     </ul>
                 </nav>
                 <section id="sectionMenus">
@@ -33,7 +35,8 @@
                             <li class="toggleSelection"><div><div> Combined  </div></div></li>
                         </ul>
                     </nav>
-                    <menu id="bracketSectionMenuContainer" class="hiddenByDefault toggleSelection">
+                   
+                    <menu id="bracketSectionMenuContainer" class="hiddenByDefault ">
                         <li>
                             <form data-controlled-object-constructor="Competition">
                                 <div class="inputContainer" data-object-field="name">
@@ -45,7 +48,20 @@
                         <li>
                             <button type='button' data-button-function="createPhase"> Create Phase</button>
                         </li>
+                        <li>
+                            <span data-display='selectedGame'>No Game Selected</span>
+                        </li>
+                        <li>
+                            <button data-button-function='toggleDebugging' data-activated=false type="button">Show Debugging</button>
+                        </li>
+                        <li>
+                            <button data-button-function='autoGeneratePopUp' data-activated=false type="button">Generate Bracket</button>
+                        </li>
                     </menu>
+
+                    <nav id="schedulingSectionMenuContainer" class="hiddenByDefault toggleSelection">
+                        
+                    </nav>
                 </section>
             </div>
             
@@ -62,7 +78,7 @@
                                     <form data-controlled-object-constructor="Division">
                                         <h1 data-mode='create' class="hiddenByDefault">Create Division <span></span></h1>
                                         <h1 data-mode='edit' class="hiddenByDefault">Edit Division</h1>
-                                        <div class="inputContainer" data-object-field="name"><label>First Name: <input type="text" /></label></div>
+                                        <div class="inputContainer" data-object-field="name"><label>Name: <input type="text" /></label></div>
                                         <!-- text inputs to make a new player and buttons to create -->
                                     </form>
                                     <section>
@@ -84,7 +100,7 @@
                                     <form data-controlled-object-constructor="Team">
                                         <h1 data-mode='create' class="hiddenByDefault">Create Team <span></span></h1>
                                         <h1 data-mode='edit' class="hiddenByDefault">Edit Team</h1>
-                                        <div class="inputContainer" data-object-field="name"><label>First Name: <input type="text" /></label></div>
+                                        <div class="inputContainer" data-object-field="name"><label>Name: <input type="text" /></label></div>
                                         <!-- text inputs to make a new player and buttons to create -->
                                     </form>
                                     <section>
@@ -139,13 +155,13 @@
                                         <form data-controlled-object-constructor="Team">
                                         <h1 data-mode='create' class="hiddenByDefault">Create Team <span></span></h1>
                                         <h1 data-mode='edit' class="hiddenByDefault">Edit Team</h1>
-                                        <div class="inputContainer" data-object-field="name"><label>First Name: <input type="text" /></label></div>
+                                        <div class="inputContainer" data-object-field="name"><label>Name: <input type="text" /></label></div>
                                         <!-- text inputs to make a new player and buttons to create -->
                                                                  </form>
                                                                  <form data-controlled-object-constructor="Division">
                                         <h1 data-mode='create' class="hiddenByDefault">Create Division <span></span></h1>
                                         <h1 data-mode='edit' class="hiddenByDefault">Edit Division</h1>
-                                        <div class="inputContainer" data-object-field="name"><label>First Name: <input type="text" /></label></div>
+                                        <div class="inputContainer" data-object-field="name"><label> Name: <input type="text" /></label></div>
                                         <!-- text inputs to make a new player and buttons to create -->
                                                                  </form>
                                                                  <section>
@@ -163,28 +179,33 @@
                     </div>
                 </div>
                 
-                <div id="bracketSection" class="hiddenByDefault toggleSelection">
+                <div id="bracketSection" class="hiddenByDefault ">
 
                 </div>
 
-                <div id="scheduleSection" class="hiddenByDefault">
+                <div id="scheduleSection" class="hiddenByDefault toggleSelection">
 
                 </div>
             </div>
         </div>
     </div>
     
-    <!-- Building blocks, nil dependancies -->
+
+    <!-- Basic Functions, nil dependancies -->
     <script src="Basic Tools.js"></script>
+    <!-- Building blocks, nil dependancies -->
     <script src="ENUM.js"></script>
     <script src="TimeMap.js"></script>
+    <script src="DupleSet.js"></script>
     <script src="ElementTemplate.js"></script>
-    <!-- Building structures, some dependancies -->
+    <!-- Code Observer, some dependancies -->
     <script src="CodeObserver.js"></script>
+    <!-- Building structures, some dependancies -->
     <script src="EventHandling.js"></script>
     <script src="Verification.js"></script>
     <script src="Registry.js"></script>
     <script src="Search.js"></script>
+
     <!-- Agents,nothing runs -->
     <script src="Player.js"></script>
     <script src="Team.js"></script>
@@ -194,10 +215,12 @@
     <script src="Block.js"></script>
     <script src="Game.js"></script>
     <script src="Link.js"></script>
+
 <!-- Outcome producers -->
 <script src="Scheduler.js"></script>
 <script src="SupportScheduler.js"></script>
 <script src="CSVGenerator.js"></script>
+<script src='AutoBracket.js'></script>
 <!-- Set-up code necessary for things to run -->
 
 <!-- Display elements on page  -->

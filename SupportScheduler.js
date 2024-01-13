@@ -1,6 +1,6 @@
 var SupportScheduler = (function () {
     function initiateDefaultOptions(options) {
-        options.supportSource ?? (options.supportSource = {
+        options.supportSource ??= {
             firstBlock: {
                 inBlock: 0,
                 externalAlts: undefined,
@@ -15,8 +15,8 @@ var SupportScheduler = (function () {
                 previousRoundParticipants: undefined,
                 backUp: -50
             }
-        })
-        options.roles ?? (options.roles = [SupportScheduler.DUTY])
+        }
+        options.roles ??= [SupportScheduler.DUTY]
 
     }
     /**
@@ -42,7 +42,7 @@ var SupportScheduler = (function () {
             } else if (teamReference instanceof FakeLink) {
                 normalisedTeamReference = teamReference
             } else {
-                Break("Tried to normalise teamReference of unexpected formate",teamReference)
+                Break("Tried to normalise teamReference of unexpected format",teamReference)
             }
             return normalisedTeamReference
         }
@@ -132,7 +132,7 @@ var SupportScheduler = (function () {
         //Identify teams suitable for support service for each phase(/block)
         for (const phase of comp.allPhasesArray) {
             //Predetermined Support Players
-            if (phase.currentSettings.get(e.SUPPORT_SELECTION) === e.PREDETERMINED) {
+            if (phase.currentSettings.get(e.SUPPORT_SELECTION.description) === e.PREDETERMINED) {
                 let phaseEntry = new Set();
                 let allBlocks = phase.allBlocksArray;
                 let phaseSupportTeams = phase.getSupportTeams();
@@ -147,7 +147,7 @@ var SupportScheduler = (function () {
                 phaseEntry.supportOwed = Math.ceil(phase.allGamesInPhase.length / phaseSupportTeams.size)
             }
             //Support Players Determined as we go, with back-up
-            if (phase.currentSettings.get(e.SUPPORT_SELECTION) === e.TOURNAMENT) {
+            if (phase.currentSettings.get(e.SUPPORT_SELECTION.description) === e.TOURNAMENT) {
                 if (phase.allBlocksArray.length === 0) continue;
 
                 let phaseEntry = new Map();
@@ -263,7 +263,7 @@ var SupportScheduler = (function () {
 
                 let availableTeamScores = phaseRegistry.obtainAvailable(timeSlot);
                 availableTeamScores = serialScoring(availableTeamScores, timeSlot, [scrPreviousService, scrPreferActive, scrEnsureBreak, scrOptional]);
-                console.log(timeSlot.scheduledItem.name, availableTeamScores.map(x => `${x.team.name}:${x.score}`))
+                // console.log(timeSlot.scheduledItem.name, availableTeamScores.map(x => `${x.team.name}:${x.score}`))  
 
                 availableTeamScores.length = Math.min(options.roles.length, availableTeamScores.length);
                 let gamePhase = timeSlot.scheduledItem.phase
@@ -276,6 +276,7 @@ var SupportScheduler = (function () {
                     }
                 }
             }
+            return simplifiedFieldSchedule;
         }
 
         function serialScoring(availableTeamScores, timeSlot, scoringFunctions) {

@@ -1,8 +1,8 @@
 var Phase = (function () {
     let id = 0;
-    CodeObserver.register(Phase,e.CREATE);
+    CodeObserver.register(Phase,e.CREATE,e.DELETE);
     function Phase({ name, parent,phaseType }) {
-        CodeObserver.register(this);
+        CodeObserver.register(this,e.VERIFICATION);
         let myId = ++id;
         let settings = new Map([
             [e.PRIORITY.description, 1], //int
@@ -55,6 +55,27 @@ var Phase = (function () {
             links.add(link);
             Verification.queue(this);
         }
+        this.removeBlock = function removeBlock(block){
+            blocks.splice(blocks.indexOf(block),1);
+            block.delete();
+        }
+        this.delete = function deletePhase(){
+            console.log("deletphase")
+            for(const block of [...blocks]){
+                block.delete();
+            }
+            for(const link of [...links]){
+                link.deleteLink();
+            }
+            this.delete=()=>null;
+            this.remakeAncestralRegister = ()=>null;
+            this.addAncestralLink = ()=>null;
+            this.verifyLinks = ()=>null;
+            this.parent.removePhase(this);
+            parent=null;
+            CodeObserver.Deletion({mark:Phase,deletedObject:this});
+            CodeObserver.deregister(this);
+        }
         this.addAncestralLink = function addAncestralLink(link,propagation=true){
             if(phaseType===e.TOURNAMENT) return true;
             if(link.source.phase===this) return true;
@@ -100,7 +121,7 @@ var Phase = (function () {
             let maxPossibleTeams=this.maxPossibleTeams;
                 this.outgoingLinks.forEach((outLink) => {
                 if(outLink.sourceRank > maxPossibleTeams) {
-                    new Objection(outLink.target,[outLink],Objection.NotEnoughTeams,this)
+                    new Objection(outLink.target,[outLink],Objection.NotEnoughTeams,this).lodge();
                     testValidity.fail(Objection.NotEnoughTeams)
                 }
             });

@@ -4,6 +4,7 @@
 var Verification = (function(){ 
     let paused = false;
     let activatedWhilePaused = false;
+    let activated = false;
     let Verification = {
         objections: new Set(),
         forVerification: new Set(),
@@ -19,9 +20,19 @@ var Verification = (function(){
         },
         activate(){
             if(!paused){
-                this.forVerification.forEach(unit=>unit.verifyLinks())
-                this.forVerification.clear();
-                console.log("~~~~~~~~~~~")
+                if(!activated){
+                    activated=true;
+                    queueMicrotask(()=>{
+                        console.log("~~~~~~~~~~~")
+                        console.time("Verification")
+                        this.forVerification.forEach(unit=>unit.verifyLinks());
+                        this.forVerification.clear();
+                        activated=false;
+                        console.timeEnd("Verification")
+                        console.log("~~~~~~~~~~~")
+                        CodeObserver.Execution({mark:this,currentFunction:this.activate,keyword:e.VERIFICATION});
+                    }) 
+                }
             } else {
                 activatedWhilePaused = true;
             }
@@ -41,8 +52,8 @@ var Verification = (function(){
         unPause(){
             if(paused){
                 paused = false;
-                if(activatedWhilePaused) this.activate();
                 activatedWhilePaused = false;
+                if(activatedWhilePaused) this.activate();
                 return true;
             } else {
                 return false;
@@ -52,9 +63,10 @@ var Verification = (function(){
     }
 
     Object.freeze(Verification);
-
+    CodeObserver.register(Verification);
 return Verification
 })()
+
 
 
 var PostponeMakingAncestralLinks = (function(){ 
@@ -109,20 +121,21 @@ return PostponeMakingAncestralLinks
 var Objection = (function(){ 
 
    Objection["SourceRankDuplication"]=  Symbol("Potential for same team to appear twice in bracket leading up to this game");
-   Objection["RecursiveLoop"]=  Symbol("A loop has been created, such that a game's or phase's sources are determiend by its outcome.");
+   Objection["RecursiveLoop"]=  Symbol("A loop has been created, such that a game's or phase's sources are determined by its outcome.");
    Objection["TwoTeamGame"]=  Symbol("Two and only two incoming links must exist");
    Objection["GameOnlyTwoRanks"]=  Symbol("Only ranks 1 and 2 valid for Games");
    Objection["TournamentAsSource"]=  Symbol("A Tournament phase cannot be used as a source");
    Objection["RoundRobinGameAsSource"]=  Symbol("Games inside a round robin cannot be a source.");
    Objection["NotATournament"]=  Symbol("In a round robin, games cannot be dependant on outcome of other games in the same Phase.");
-   Objection["OneBlockOneTeam"]=  Symbol("A team can only appear once per block, or even have the potential for doing. ");
+   Objection["OneBlockOneTeam"]=  Symbol("A team can only appear once per block, or even have the potential for doing so.");
+   Objection["SourceSameBlock"]=  Symbol("The source for a game cannot be in the same block");
    Objection["MustHaveSeed"]=  Symbol("A link coming into a phase must have a seed number");
    Objection["RedundantSeeds"]=  Symbol("Links to same source and source rank cannot have different seeds");
    Objection["OverLoadedSeed"]=  Symbol("Links with the same seed must share source and source rank");
    Objection["NotEnoughTeams"]=  Symbol("Cannot have a source rank from a Phase higher than the max number of participating teams");
 
 
-    function Objection(primeSuspect,associatedLinkList,reason,objector){
+    function Objection(primeSuspect,associatedLinkList=[],reason,objector){
         this.primeSuspect = primeSuspect;
         this.associatedLinkList = associatedLinkList;
         this.reason = reason;   

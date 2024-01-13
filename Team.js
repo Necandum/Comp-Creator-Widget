@@ -29,6 +29,7 @@ var Team = (function () {
                 division.remove(this);
             }
             allTeams.delete(this.name);
+            myId=null;
             name="Deleted";
         }
         this.updateSettings = function (newSettings) {

@@ -55,7 +55,7 @@ function TimeMap() {
                  findResult.items.push(entry.item);
                  findResult.match=true;
             }
-        }
+        };
         if(findResult.match===false){
             for(i;i<sortedByStart.length;i++){
                 let entry = sortedByStart[i];

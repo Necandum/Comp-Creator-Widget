@@ -25,6 +25,7 @@ var e = {
         POTENTIAL_CLASH:"potentialClash",
         MODE:"mode",
         CREATE:"create",
+        DELETE:"delete",
         EDIT:"edit",
         CONTROLLED_OBJECT:"controlledObject",
         CONTROLLED_OBJECT_CONSTRUCTOR:"controlledObjectConstructor",
@@ -41,7 +42,7 @@ var e = {
         CONTENTS:"contents",
         FIELD_NAME:"fieldName",
         SECTION_PARAMETERNS:"sectionParameters",
-        MASTER:"maste",
+        MASTER:"master",
         LEFT_SLAVE:"leftSlave",
         RIGHT_SLAVE:"rightSlave",
         IDENTITY:"identity",
@@ -61,7 +62,26 @@ var e = {
         TOP_LINK:"topLink",
         BOTTOM_LINK:"bottomLink",
         GAME_ORDER:"gameOrder",
-        NAVIGATION_SECTION_TEMPLATE:"navigationSectionTemplate"
+        NAVIGATION_SECTION_TEMPLATE:"navigationSectionTemplate",
+        ALL:"all",
+        SOURCE:"source",
+        SOURCE_RANK:"sourceRank",
+        LINK:"link",
+        CONTROLS:"controls",
+        SELECTED_DATE:"selectedDate",
+        FIELD_SCHEDULE:"fieldSchedule",
+        SET_POINT:"setPoint",
+        INCREMENT:"increment",
+        END_TIME:"endTime",
+        CELL_TIME:"cellTime",
+        CAPS:"caps",
+        DAY_BUTTONS:"dayButtons",
+        NOT_IN_USE:"notInUse",
+        RESTRICTIONS:"restrictions",
+        DISPLAY:"display",
+        DISPLAY_TYPES:"displayTypes",
+        FORM:"form"
+
 };
 
 (function () {
@@ -80,3 +100,26 @@ var e = {
 
 
 Object.freeze(e);
+
+var d = {
+
+    DAY_MS:24*60*60*1000,
+    HOUR_MS: 60*60*1000,
+    MINUTE_MS: 60*1000,
+    SECOND_MS: 1000
+}
+
+
+Object.freeze(d);
+
+var today = {
+    get YEAR(){return new Date().getFullYear()},
+    get MONTH(){return new Date().getMonth()},
+    get DATE(){return new Date().getDate()},
+    get DAY(){return new Date().getDay()},
+    get HOUR(){return new Date().getHours()},
+    get MIN(){return new Date().getMinutes()},
+    get SEC(){return new Date().getSeconds()},
+    get MS(){return new Date().getMilliseconds()},
+}
+Object.freeze(today);

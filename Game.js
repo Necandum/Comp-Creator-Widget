@@ -1,9 +1,9 @@
 
 var Game = (function () {
     let id = 0;
-    CodeObserver.register(Game,e.CREATE);
+    CodeObserver.register(Game,e.CREATE,e.DELETE);
     function Game(parent) {
-
+        CodeObserver.register(this,e.VERIFICATION);
         let links = new Set();
         let validity = new ValidityTracker(false);
         let ancestralLinksRegistrar = new AncestorRegistry(this);
@@ -22,7 +22,7 @@ var Game = (function () {
         defineGetter({ obj: this, name: "name", func: () => `Game ${myId}` });
         defineGetter({ obj: this, name: "validity", func: () => validity.copy()});
         defineGetter({obj: this, name: "gameStages", func: () => (customGameStages) ? customGameStages :
-                                                                                      this.phase.currentSettings.get(e.GAME_STAGES)
+                                                                                      this.phase.currentSettings.get(e.GAME_STAGES.description)
         });
         defineGetter({ obj: this, name: "length", func: () => parseInt(this.gameStages.at(-1).endAtMiliSecond)});
 
@@ -63,6 +63,24 @@ var Game = (function () {
                 this.remakeAncestralRegister(link);
             }
         }
+        this.delete = function deleteGame(){
+            Verification.queue(this.block);
+            Verification.queue(this.phase);
+            Verification.activate();
+            this.delete=()=>null;
+            this.remakeAncestralRegister = ()=>null;
+            this.addAncestralLink = ()=>null;
+            this.addLink = ()=>null;
+            this.verifyLinks = ()=>null;
+            myId=null;
+            for(const link of [...links]){
+                this.removeLink(link);
+            }
+            this.block.removeGame(this);
+            parent=null;
+            CodeObserver.Deletion({mark:Game,deletedObject:this})
+            CodeObserver.deregister(this);
+        }
         let countParentsThatWillCascade=false;
         this.remakeAncestralRegister = function remakeAncestralRegister(originatingLink){
             Verification.queue(this)
@@ -102,7 +120,7 @@ var Game = (function () {
 
             this.outgoingLinks.forEach((outLink) => {
                 if (outLink.sourceRank > 2){ 
-                    new Objection(outLink.target,[outLink],Objection.GameOnlyTwoRanks,this)
+                    new Objection(outLink.target,[outLink],Objection.GameOnlyTwoRanks,thisGame).lodge();
                     testValidity.fail(Objection.GameOnlyTwoRanks);
                 }
             });
@@ -110,24 +128,29 @@ var Game = (function () {
             this.incomingLinks.forEach((inLink) => {
                 
                 if(inLink.source?.phase?.phaseType===e.ROUND_ROBIN && inLink.source instanceof Game){
-                    new Objection(this,[inLink],Objection.RoundRobinGameAsSource,this)
+                    new Objection(thisGame,[inLink],Objection.RoundRobinGameAsSource,thisGame).lodge()
                     testValidity.fail(Objection.RoundRobinGameAsSource)
                 }
                 if(inLink.source?.phase?.phaseType===e.TOURNAMENT && inLink.source instanceof Phase){
-                    new Objection(this,[inLink],Objection.TournamentAsSource,this)
+                    new Objection(thisGame,[inLink],Objection.TournamentAsSource,thisGame).lodge();
                     testValidity.fail(Objection.TournamentAsSource)
+                }
+                if(inLink.source?.block === thisGame.block){
+                    new Objection(thisGame,[inLink],Objection.OneBlockOneTeam,thisGame).lodge();
+                    testValidity.fail(Objection.OneBlockOneTeam);
                 }
             });
 
             if (validity.status !== testValidity.status || validity.message !== testValidity.message) changeValidity(testValidity);
             return testValidity
         }
-
         function changeValidity(newValidity) {
             validity = newValidity;
-            // CodeObserver.Execution({ mark: thisGame, currentFunction: changeValidity, currentObject: thisGame })
+            CodeObserver.Execution({ mark: thisGame, currentFunction: changeValidity, currentObject: thisGame,keyword:e.VERIFICATION })
         }
         CodeObserver.Creation({mark:Game,newObject:this});
+        Verification.queue(this);
+        Verification.activate();
     }
     
     return Game

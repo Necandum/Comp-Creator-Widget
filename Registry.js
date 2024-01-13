@@ -1,5 +1,10 @@
 var AncestorRegistry = (function(){ 
-
+    function loopDetected(thisRegistry,link,ancestorLink){
+       if(!thisRegistry.insideALoop) {
+       thisRegistry._objections.push( new Objection(link.source,Array.from(thisRegistry._loopCreators),Objection.RecursiveLoop,thisRegistry._containingUnit));
+    }
+        thisRegistry._loopCreators.add(ancestorLink);
+    }
     function AncestorRegistry(containingUnit,{selectedRegistrar}={}){
         this._containingUnit = containingUnit
         this._uniqueAncestorLinks = new Set();
@@ -15,8 +20,10 @@ var AncestorRegistry = (function(){
             sourceAncestorLinks.unshift(link);
             for(const ancestorLink of sourceAncestorLinks){
                 if(ancestorLink.source === this._containingUnit || ancestorLink.source === this._containingUnit.phase){
-                    this._loopCreators.add(ancestorLink);
-                    this._objections.push( new Objection(link.source,Array.from(this._loopCreators),Objection.RecursiveLoop,this._containingUnit));
+                    loopDetected(this,link,ancestorLink);
+                    return false;
+                }
+                if(this.insideALoop){
                     return false;
                 }
                 if(this._uniqueAdd(ancestorLink)){
@@ -45,8 +52,7 @@ var AncestorRegistry = (function(){
                    if(this._registrar.test(link)){
                     clashing=true;
                    }
-                //    if(this._containingUnit.id==8) {console.log("clashing",clashing,this._registrar.registry,link)}
-                }
+                }   
             return clashing;
         },
         _uniqueAdd(link){

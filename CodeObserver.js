@@ -2,6 +2,7 @@
 /**
  * @typedef CodeObserver
  * @property {(mark:Object,handlerGroupName:enum)=>undefined} register
+ * @property {(mark:Object)=>undefined} deregister
  * @property {(handlerGroupName:enum,handlerArray:Array)=>undefined} registerHandlerGroup
  * @property {(handlerGroupName:enum,newMembers:Array,async:Boolean)=>undefined} addToHandlerGroup
  * @property {(mark,handler)} addHandler
@@ -9,6 +10,7 @@
  * @property {function} distributeObservation
  * @property {({mark,currentFunction,currentObject})} Execution - Merely messages that a function executed. 
  * @property {({mark,constructor,newObject})} Creation - New object created from constructor
+ * @property {({mark,deletedObject})} Deletion - Object deleted from constructor
  */
 
 /**
@@ -26,8 +28,11 @@ var CodeObserver = (function(){
     let CodeObserver = {
         
         register(mark,...handlerGroups){
-            let handlerArray ={sync:[],async:[]}
-            handlerArray.handlerGroups= [...handlerGroups]
+            let handlerArray ={
+                sync:[],
+                async:[],
+                handlerGroups:[...handlerGroups]
+            }
             if(!registry.has(mark)) {
                 registry.set(mark,handlerArray);
                     for(const handlerGroupName of handlerArray.handlerGroups){
@@ -35,10 +40,14 @@ var CodeObserver = (function(){
                     }
             }
         },
-        registerHandlerGroup(handlerGroupName,{sync=[],async=[]}){
+        deregister(mark){
+            return registry.delete(mark);
+        },
+        registerHandlerGroup(handlerGroupName,{sync=[],async=[]}={}){
             handlerRegistry.set(handlerGroupName,{sync,async});
         },
         addToHandlerGroup(handlerGroupName,newMembers=[],async){
+            if(!handlerRegistry.has(handlerGroupName)) Break("Handler group has not been defined",{handlerGroupName,handlerRegistry});
             if(async){
                 handlerRegistry.get(handlerGroupName).async.push(...newMembers);
             } else {
@@ -65,7 +74,6 @@ var CodeObserver = (function(){
         },
          distributeObservation:  async function(mark,observer,observation){
             let allHandlers =  registry.get(mark);
-
             for(const handler of allHandlers.sync){
                     handler(observer,observation);
             }
@@ -73,21 +81,21 @@ var CodeObserver = (function(){
             for(const handlerGroupName of allHandlers.handlerGroups){
                 let syncHandlerGroup = handlerRegistry.get(handlerGroupName).sync;
                 syncHandlerGroup.forEach(handler => {
-                    handler(observer,observation);
+                    handler(observer,{...observation,handlerGroupName});
                 });
             }
+            queueMicrotask(()=>{
 
-            allHandlers = await registry.get(mark);
-
-            for(const handler of allHandlers.async){
+                for(const handler of allHandlers.async){
                     handler(observer,observation);
-            }
-            for(const handlerGroupName of allHandlers.handlerGroups){
-                let asyncHandlerGroup = handlerRegistry.get(handlerGroupName).async;
-                asyncHandlerGroup.forEach(handler => {
-                    handler(observer,observation);
-                });
-            }
+                }
+                for(const handlerGroupName of allHandlers.handlerGroups){
+                    let asyncHandlerGroup = handlerRegistry.get(handlerGroupName).async;
+                    asyncHandlerGroup.forEach(handler => {
+                        handler(observer,{...observation,handlerGroupName});
+                    });
+                }
+            })
         }
 
     }
@@ -99,6 +107,9 @@ var CodeObserver = (function(){
     }
     CodeObserver.Creation = function Creation({mark,newObject}){
         CodeObserver.distributeObservation(mark,Creation,{mark,newObject});
+    }
+    CodeObserver.Deletion = function Deletion({mark,deletedObject}){
+        CodeObserver.distributeObservation(mark,Deletion,{mark,deletedObject});
     }
 Object.freeze(CodeObserver);
 return CodeObserver

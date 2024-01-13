@@ -35,7 +35,8 @@ var Division = (function(){
             allDivisions.delete(this.name);
             divisionParents.forEach(parentDivision=>parentDivision.remove(this));
             divisionContent.forEach(teamOrDivision=>teamOrDivision.removeFromDivision(this));
-            name="Deleted"
+            name="Deleted";
+            myId=null;
         }
 
         this.changeDetail = function (detail, newValue) {

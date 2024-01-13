@@ -16,23 +16,6 @@ div.failed{
 }
 
 
-.gameContainer>div.contentsDisplayArea{
-    background-color: blueviolet;
-    padding: 1em;
-    margin:5px;
-}
-
-.blockContainer>div.contentsDisplayArea{
-    background-color: greenyellow;
-    padding:1em;
-    margin:10px;
-}
-
-.phaseContainer>div.contentsDisplayArea{
-    background-color: bisque;
-    padding:1em;
-}
-
 menu#bracketSectionMenuContainer.toggleSelection{
     display:flex;
     flex-wrap: wrap;

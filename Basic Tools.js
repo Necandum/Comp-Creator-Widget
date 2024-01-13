@@ -44,16 +44,94 @@ function isSpaceBar(event){
         event.button===0) clickEventTriggeredBySpaceBarProbably = true;
         return clickEventTriggeredBySpaceBarProbably;
 }
-function getDayName(day) {
+function getDayName(dayIndex) {
     const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     
-    if (day >= 0 && day <= daysOfWeek.length - 1) {
-      return daysOfWeek[day];
+    if (dayIndex >= 0 && dayIndex < daysOfWeek.length) {
+      return daysOfWeek[dayIndex];
     } else {
       return "Invalid day";
     }
   }
-  
+function getMonthName(monthIndex){
+    const months = ['Jan','Feb','Mar',"Apr",'May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    if (monthIndex >= 0 && monthIndex < months.length) {
+        return months[monthIndex];
+      } else {
+        return "Invalid month";
+      }
+}
+function getHumanDate(time,options){
+    let date = new Date(time);
+    return`${String(date.getDate()).padStart(2,"0")}-${getMonthName(date.getMonth())}`
+}
+  function getDayBoundary(time){
+    let date= new Date(time);
+    date.setHours(0,0,0,0)
+    let dayStart = date.getTime()
+    date.setHours(24,0,0,0)
+    let dayEnd = date.getTime();
+    return {dayStart,dayEnd};
+}
+  function getUTCDayBoundary(time){
+    let date= new Date(time);
+    date.setUTCHours(0,0,0,0)
+    let dayStart = date.getTime()
+    date.setUTCHours(24,0,0,0)
+    let dayEnd = date.getTime();
+    return {dayStart,dayEnd};
+}
+function getMsFromTimeString(string){
+    let regex = /(?<hours>\d{2})[:](?<minutes>\d{2})(?:[:](?<seconds>\d{2})(?:[.](?<ms>\d{3}))?)?/gmi;
+    let match = regex.exec(string);
+    if(!match) return null;
+    let ms =parseInt(match.groups.hours)*d.HOUR_MS + parseInt(match.groups.minutes)*d.MINUTE_MS;
+    if(match.groups.seconds) ms += parseInt(match.groups.seconds)*d.SECOND_MS;
+    if(match.groups.ms) ms+=parseInt(match.groups.ms);
+    return ms;
+}
+function getTimeStringFromMs(ms){
+    if(!ms) return "00:00:00.000";
+    ms = parseInt(ms);
+    let hours = Math.floor(ms/d.HOUR_MS);
+    let minutes = Math.floor((ms % d.HOUR_MS)/d.MINUTE_MS);
+    let seconds = Math.floor((ms % d.MINUTE_MS) / d.SECOND_MS);
+    let milliseconds = Math.floor(ms % d.SECOND_MS);
+    return `${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:${String(seconds).padStart(2,"0")}.${String(milliseconds).padStart(3,"0")}`;
+}
+function getUTCTimeFromDateString(dateString){
+    let regex = /(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})/gmi;
+    let match = regex.exec(dateString);
+    return Date.UTC(parseInt(match.groups.year),parseInt(match.groups.month)-1,parseInt(match.groups.day),0,0,0,0);
+}
+function getDateStringFromUTCTime(time){
+    let date = new Date(parseInt(time));
+    let year = String(date.getUTCFullYear());
+    let month = String(date.getUTCMonth()+1).padStart(2,"0");
+    let day = String(date.getUTCDate()).padStart(2,"0");
+    let dateString = `${year}-${month}-${day}`;
+    return dateString;
+}
+function getUTCDateFromStrings(dateString,timeString){
+    return new Date(`${dateString}T${timeString}Z`)
+}
+function universaliseLocalTime(localTime){
+    let localDate = new Date(localTime);
+    let utcTime = Date.UTC(
+        localDate.getFullYear(),
+        localDate.getMonth(),
+        localDate.getDate(),
+        localDate.getHours(),
+        localDate.getMinutes(),
+        localDate.getSeconds(),
+        localDate.getMilliseconds()
+    );
+    return utcTime;
+}
+function getUTCDateFromTime(time){
+
+}
+
 function intToOrdinal(input){
     let int = parseInt(input);
     if(!Number.isInteger(int)) Break("Not an integer",{input,int});
@@ -61,6 +139,11 @@ function intToOrdinal(input){
         let v = int%100;
         let string =  int + (s[(v-20)%10] || s[v] || s[0]);
     return string
+}
+function removeMultipleLines(string){
+    let regex = /\s*[\r\n]{1,2}\s*/gm;
+    let singleLineString = string.replace(regex,"");
+    return singleLineString ;
 }
 function deepClone(obj) {
     return JSON.parse(JSON.stringify(obj));

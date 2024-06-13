@@ -50,18 +50,35 @@ var CSVGenerator = (function(){
 
                 let team2 = (game.incomingLinks[1].source instanceof Team) ? game.incomingLinks[1].source.name:
                                                                                       linkingFormat(game.incomingLinks[1]);
+                let ref1, ref2,duty;
+                if(timeSlot.supportRoles.has(SupportScheduler.REF1)){
+                    let assignedTeam = timeSlot.supportRoles.get(SupportScheduler.REF1)
+                    ref1 = (assignedTeam.source instanceof Team) ? assignedTeam.source.name: linkingFormat(assignedTeam);
+                }
+                if(timeSlot.supportRoles.has(SupportScheduler.REF2)){
+                    let assignedTeam = timeSlot.supportRoles.get(SupportScheduler.REF2)
+                    ref2 = (assignedTeam.source instanceof Team) ? assignedTeam.source.name: linkingFormat(assignedTeam);
+                }
+                if(timeSlot.supportRoles.has(SupportScheduler.DUTY)){
+                    let assignedTeam = timeSlot.supportRoles.get(SupportScheduler.DUTY)
+                    console.log("Assigned team",assignedTeam)
+                    if(assignedTeam){ 
+                        duty = (assignedTeam.source instanceof Team) ? assignedTeam.source.name: linkingFormat(assignedTeam);
+                    }
+                }
                 let gameArray = [
                 convertDateToCompCreatorTimeString( new Date(timeSlot.absoluteStartTime)),
                 timeSlot.fieldNumber.toString(),
                 poolName.toString(),
                 team1,
                 team2,
-                "X",
-                "X",
-                "X"
+                ref1??"X",
+                ref2??"X",
+                duty??"X"
                 ]
                 drawArray.push(gameArray);
             }
+            console.log(drawArray)
         }
         return drawArray
     }
@@ -69,14 +86,14 @@ var CSVGenerator = (function(){
         return `_${intToOrdinal(link.sourceRank)}::${link.source.name}_`;
     }
     function convertDateToCompCreatorTimeString(date){
-        let year = date.getFullYear();
-        let month = date.getMonth().toString().padStart(2,'0');
-        let day = date.getDate().toString().padStart(2,'0');
-        let hour = date.getHours();
-        let minutes = date.getMinutes().toString().padStart(2,'0');
+        let year = date.getUTCFullYear();
+        let month = (date.getUTCMonth()+1).toString().padStart(2,'0');
+        let day = date.getUTCDate().toString().padStart(2,'0');
+        let hour = date.getUTCHours();
+        let minutes = date.getUTCMinutes().toString().padStart(2,'0');
         let halfDay = (hour>11) ? "pm":"am";
 
-        hour = (hour>11) ? hour-12: hour;
+        hour = (hour>12) ? hour-12: hour;
         hour = hour.toString().padStart(2,'0')
 
         return `${year}-${month}-${day} ${hour}:${minutes}${halfDay}`

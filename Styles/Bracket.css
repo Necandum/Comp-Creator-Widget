@@ -1,26 +1,199 @@
 
 
-.gameContainer.passedVerification>div.contentsDisplayArea{
+.bracketContainer>.anteChildrenDisplayArea{
+    padding-left: 8em;
+    padding-bottom:1em;
+    font-family:'Arial Bold', Arial, sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+
+.phaseContainer{
+    width:min-content;
+    padding-bottom:10px;
+    padding-right:10px;
+    margin-bottom: 1em;
+}
+.phaseContainer>.contentsDisplayArea{
+    display:flex;
+    align-items:center;
+    padding:1em;
+}
+.phaseContainer>.contentsDisplayArea>.childContainer{
+    display:flex;
+    flex-basis:0px;
+    align-items: stretch;
+    /* align-self: flex-start; */
+    /* width:min-content; */
+}
+
+.phaseContainer>.postChildrenDisplayArea{
+    padding:1em;
+    border: 1px solid black;
+    margin-left:1em;
+    width:max-content;
+}
+.phaseContainer>.postChildrenDisplayArea input[type='number']{
+    width:40px;
+}
+.phaseContainer>.postChildrenDisplayArea .formControls{
+    display:flex;
+    justify-content: left;
+    column-gap: 3px;
+}
+.phaseContainer>.postChildrenDisplayArea>form>.inputContainers{
+    display:flex;
+    justify-content:left;
+    column-gap:8px;
+}
+.phaseContainer>.postChildrenDisplayArea>form>.inputContainers>.inputContainer{
+   margin:0px;
+}
+
+.blockContainer{
+    display:grid;
+    grid-template-columns: auto max-content;
+    grid-template-rows: auto min-content;
+    grid-template-areas: 
+    "plus game"
+    " .    legend";
+    flex-basis:0;
+    flex-shrink:0;
+    flex-grow:1;
+    align-items: center;
+    padding: 0 var(--block-container-left-right-padding) 0;
+    /* height:100%; */
+}
+.blockContainer>div:nth-child(1){
+    grid-area:plus;
+}
+.blockContainer>div:nth-child(2){
+    grid-area:game;
+}
+.blockContainer>div:nth-child(3){
+    grid-area:legend;
+}
+.blockContainer>.contentsDisplayArea{
+    display:flex;
+    flex-direction: column;
+    align-items: center;
+    padding:1em;
+    height:100%;
+}
+.blockContainer>.contentsDisplayArea>.childContainer{
+    display:flex;
+    flex-direction: column;
+    justify-content: space-between;
+    flex-grow:1;
+}
+.blockContainer>.contentsDisplayArea>.gameAdditionButton{
+    order:-1;
+}
+.blockContainer>.postChildrenDisplayArea{
+    display: flex;
+    justify-content: center;
+    column-gap: 8px;
+    margin-top: 4px;
+}
+* {
+    --block-container-left-right-padding:0.2em;
+}
+.blockAdditionButton{
+    position:relative;
+    --block-addition-button-width: 20px;
+    left: calc(-1 * ((var(--block-addition-button-width)) / 2 + var(--block-container-left-right-padding)));
+}
+.blockAdditionButton button{
+    position:absolute;
+    width: var(--block-addition-button-width);
+    padding:0;
+}
+
+.contentsDisplayArea>.blockAdditionButton {
+    top:-11px;
+}
+
+.gameContainer {
+    display:flex;
+    flex-grow:1;
+    flex-direction:column;
+    align-items: center;
+    --min-width:150px;
+}   
+.gameContainer>.contentsDisplayArea {
+    display:grid;
+    grid-template-areas:
+    "text edit"
+    "text delete";
+    column-gap:5px;
+    row-gap:2px;
+    grid-template-columns: 1fr min-content;
+    margin:0.1em 0.1em;
+    flex-basis: 0;
+    flex-grow:0;
+    border-radius: 8px;
+    padding:3px;
+    min-width:var(--min-width);
+}
+.gameContainer>.contentsDisplayArea>section.childContainer {
+grid-area:text;
+}
+.gameContainer>.contentsDisplayArea>button {
+grid-area:edit;
+}
+.gameContainer>.contentsDisplayArea>span {
+grid-area:delete;
+}
+.gameContainer>.contentsDisplayArea>span>button {
+ height:100%;
+ width:100%;
+}
+
+.gameContainer>.contentsDisplayArea>.childContainer {
+    display:flex;
+    flex-direction: column;
+}
+.gameContainer>.contentsDisplayArea>.childContainer>.gameLabel {
+    order:1;
+    text-align: center;
+}
+.gameContainer>.contentsDisplayArea>.childContainer>.bottomLink {
+    order:2;
+}
+.gameContainer>.postChildrenDisplayArea{
+    justify-content: center;
+    display:flex;
+    flex-direction: column;
+    flex-basis: 0;
+    flex-grow:1;
+}
+
+
+
+
+div.gameContainer.selectedGame>div.contentsDisplayArea>section.childContainer{
+    border:3px solid yellow;
+}
+
+.gameContainer.passedVerification>div.contentsDisplayArea>.childContainer{
+
 }
 .gameContainer.failedVerification>div.contentsDisplayArea{
     background-color: red;
 }
 .gameContainer>div.contentsDisplayArea{
-    background-color: blueviolet;
-    padding: 1em;
-    margin:5px;
+    background-color: rgb(142, 122, 239);
 }
 
 .blockContainer.passedVerification>div.contentsDisplayArea{
 
 }
 .blockContainer.failedVerification>div.contentsDisplayArea{
-    background-color: red;
+    background-color: palevioletred;
 }
 .blockContainer>div.contentsDisplayArea{
-    background-color: greenyellow;
-    padding:1em;
-    margin:10px;
+    background-color: bisque;
 }
 
 .phaseContainer.passedVerification>div.contentsDisplayArea{
@@ -28,9 +201,8 @@
 .phaseContainer.failedVerification>div.contentsDisplayArea{
     background-color: red;
 }
-.phaseContainer>div.contentsDisplayArea{
-    background-color: bisque;
-    padding:1em;
+.phaseContainer{
+    background-color: white;
 }
 
 .verificationSource.debuggingVisible>div.contentsDisplayArea,

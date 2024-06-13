@@ -276,6 +276,7 @@ var SupportScheduler = (function () {
                     }
                 }
             }
+            CodeObserver.Creation({mark:UIManager.ScheduleSettings,newObject:simplifiedFieldSchedule});
             return simplifiedFieldSchedule;
         }
 

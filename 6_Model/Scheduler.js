@@ -284,8 +284,11 @@
             return newTimeSlot;
         },
         addToDayMap(timeSlot){
-            let {timeSlotDayStart,timeSlotDayEnd}=getUTCDayBoundary(timeSlot.absoluteStartTime);
-                for(let i=0;i*d.DAY_MS+timeSlotDayStart<=timeSlotDayEnd;i++){
+            let dayBoundaries=getUTCDayBoundary(timeSlot.absoluteStartTime);
+            let timeSlotAbsoluteEndTime = timeSlot.absoluteStartTime + timeSlot.length;
+            let timeSlotDayStart = dayBoundaries.dayStart;
+            let timeSlotDayEnd = dayBoundaries.dayEnd;
+            for(let i=0;(i*d.DAY_MS+timeSlotDayStart)<timeSlotAbsoluteEndTime;i++){
                     let dayStart = i*d.DAY_MS+timeSlotDayStart
                     if(!this._scheduledGames.dayMap.has(dayStart)){
                         this._scheduledGames.dayMap.set(dayStart,new Set());
@@ -309,7 +312,7 @@
                         } else {
                             if(timeSlot.startTime<dayEnd){
                             timeSlot.modifyTimes({newStartTime:dayEnd});
-                            // timeSlot.field.set(timeSlot,{timeSlot});
+                            timeSlot.field.set(timeSlot,{timeSlot});
                         }
                         }
                     }
@@ -404,6 +407,7 @@
             }
             simplifiedFieldSchedule.phaseEndTimes = new Map(this._allPhases);
             simplifiedFieldSchedule.dayMap = this._scheduledGames.dayMap;
+            CodeObserver.Creation({mark:UIManager.ScheduleSettings,newObject:simplifiedFieldSchedule});
             return simplifiedFieldSchedule
         },
 

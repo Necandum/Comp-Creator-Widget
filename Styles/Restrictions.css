@@ -1,0 +1,98 @@
+.restrictionEditor{
+    border:1px solid black;
+    /* display:flex;
+    flex-direction: column; */
+    max-width:70%;
+    padding: 0.3em 0.8em 0.8em;
+    max-height:100%;
+    flex-basis:max-content;
+    width:max-content;
+    min-width:330px;
+}
+
+.restrictionEditor>section.inputContainers {
+        /* /* display:flex;
+        flex-direction: column;
+        overflow-y: auto;
+        max-height:60%; */
+        width:max-content; 
+        display: inline-block;
+}
+.restrictionEditor>.inputContainers input[type='number']{
+    width:40px;
+}
+.restrictionEditor>.inputContainers .inputContainer{
+    margin:0.4em 0.3em;
+    width:max-content;
+}
+.restrictionEditor>.inputContainers .inputContainer input{
+    margin:0;
+}
+
+
+.restrictionEditor>.inputContainers>section:nth-child(1){
+    display:grid;
+    grid-template-columns: max-content 1fr 1fr 1fr 1fr;
+    width:max-content;
+}
+.restrictionEditor>.inputContainers>section:nth-child(1)>.inputContainer:nth-child(1){
+    grid-column: 1/4;
+}
+.restrictionEditor>.inputContainers>section:nth-child(1)>.inputContainer:nth-child(2){
+    grid-column: 4/6;
+}
+.restrictionEditor>.inputContainers>section:nth-child(1)>.inputContainer:nth-child(3){
+    grid-row: 2;
+    grid-column: 1/2;
+}
+.restrictionEditor>.inputContainers>section:nth-child(1)>.inputContainer:nth-child(4){
+    grid-row: 2;
+    grid-column: 2/-1;
+}
+.restrictionEditor>.inputContainers>section:nth-child(1)>.inputContainer:nth-child(5){
+    grid-row: 3;
+    grid-column: 1/2;
+}
+.restrictionEditor>.inputContainers>section:nth-child(1)>.inputContainer:nth-child(6){
+    grid-row: 3;
+    grid-column: 2/-1;
+}
+.restrictionEditor>.inputContainers>section:nth-child(2) .radioButtonContainer{
+    display:flex;
+    flex-direction: column;
+}
+.restrictionEditor>.inputContainers>section:nth-child(3) {
+    display:grid;
+}
+.restrictionEditor>.inputContainers>section:nth-child(3)>.inputContainer:nth-child(-n + 6) {
+    grid-row: 1;
+}
+.restrictionEditor>.inputContainers>section:nth-child(3)>.inputContainer:nth-child(n + 6) {
+    grid-row: 2;
+}
+
+.restrictionEditor .formControls {
+    display:flex;
+    justify-content: left;
+    padding-top:0.3em;
+}
+.restrictionEditor .formControls>* {
+    margin-right:0.2em;
+}
+.restrictionDisplay{
+    min-width:30%;
+    display:flex;
+    padding:0.3em;
+    flex-direction: column;
+    row-gap: 12px;
+} 
+
+.restrictionDisplay>.displayItem{
+    display:flex;
+    column-gap: 8px;
+    align-items: center;
+    padding:0.4em;
+    background-color: lightblue;
+    border-radius: 8px;
+    width:max-content;
+}

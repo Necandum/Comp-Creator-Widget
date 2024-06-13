@@ -80,7 +80,8 @@ var e = {
         RESTRICTIONS:"restrictions",
         DISPLAY:"display",
         DISPLAY_TYPES:"displayTypes",
-        FORM:"form"
+        FORM:"form",
+        NEW:"new"
 
 };
 

@@ -3,7 +3,7 @@ var Team = (function () {
     let allTeams = new Map();
     defineGetter({ obj: Team, name: "allTeams", func: () => new Map(allTeams.entries())});
     defineGetter({ obj: Team, name: "allTeamsArray", func: () => Array.from(allTeams.values())});
-
+    CodeObserver.register(Team,e.EDIT);
     function Team({name = `Unnamed ${id + 1}`}) {
         if (allTeams.has(name)) throw new Error('Team name already exists');
         let myId = ++id;
@@ -38,7 +38,7 @@ var Team = (function () {
                     allTeams.delete(name);
                     name = newSettings.name;
                     allTeams.set(name,this);
-                    CodeObserver.Execution({mark:Team,currentFunction:this.updateSettings,currentObject:this});
+                    CodeObserver.Execution({mark:Team,currentFunction:this.updateSettings,currentObject:this,keyword:e.EDIT});
                 }
         }
         this.addToDivision=function(division){

@@ -1,0 +1,46 @@
+.calendar {
+    padding:0em 1.5em;
+}
+
+.calendar>.controlPanel>.daySelection>*{
+    margin:0px 0.3em;
+}
+.calendar>.controlPanel{
+    padding:1em 0em;
+}
+
+.calendar>.controlPanel button.toggleSelection{
+    background-color: var(--sub-menu-color)
+}
+
+.calendar>.calendarDisplay>.calendarDayDisplay table {
+    border-collapse: collapse;
+    border: 1px solid black;
+}
+.calendar>.calendarDisplay>.calendarDayDisplay table>tr>* {
+    border: 1px solid black;
+    vertical-align: top;
+    padding:0em 0.4em 0.2em;
+}
+.calendar>.calendarDisplay>.calendarDayDisplay table>tr>* {
+    border: 1px solid black;
+    vertical-align: top;
+    padding:0.1em 0.4em 0.5em;
+}
+.calendar>.calendarDisplay>.calendarDayDisplay table th {
+    text-align: center;
+}
+.calendar>.calendarDisplay>.calendarDayDisplay table td:nth-child(1) {
+   
+}
+.calendar>.calendarDisplay>.calendarDayDisplay table td div.cellText {
+   display:flex;
+   justify-content: space-between;
+   width:100%;
+}
+.calendar>.calendarDisplay>.calendarDayDisplay table p {
+    margin: 0 0.2em;
+    display:inline;
+}
+.calendar>.calendarDisplay>.calendarDayDisplay table p:nth-child(2) {
+}

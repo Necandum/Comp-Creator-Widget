@@ -5,7 +5,7 @@
  * @property {(mark:Object)=>undefined} deregister
  * @property {(handlerGroupName:enum,handlerArray:Array)=>undefined} registerHandlerGroup
  * @property {(handlerGroupName:enum,newMembers:Array,async:Boolean)=>undefined} addToHandlerGroup
- * @property {(mark,handler)} addHandler
+ * @property {(mark,handler,async)} addHandler
  * @property {function} removeHandler
  * @property {function} distributeObservation
  * @property {({mark,currentFunction,currentObject})} Execution - Merely messages that a function executed. 

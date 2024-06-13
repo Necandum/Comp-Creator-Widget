@@ -12,7 +12,12 @@
     <link rel="stylesheet" href="Styles/Navigator.css">
     <link rel="stylesheet" href="Styles/LinkCreationPopUp.css">
     <link rel="stylesheet" href="Styles/popUp.css">
+    <link rel="stylesheet" href="Styles/phaseEditor.css">
+    <link rel="stylesheet" href="Styles/GenerateBracket.css">
     <link rel="stylesheet" href="Styles/InputContainers.css">
+    <link rel="stylesheet" href="Styles/Calendar.css">
+    <link rel="stylesheet" href="Styles/Restrictions.css">
+    <link rel="stylesheet" href="Styles/teamSelector.css">
     <title>Document</title>
 </head>
 <body>
@@ -20,13 +25,13 @@
             <div id="topMenuContainer">
                 <nav id="configurationMenuContainer">
                     <ul id="configurationMenu">
-                        <li > Competitor Set-up</li>
+                        <li class="toggleSelection"> Competitor Set-up</li>
                         <li > Bracket Creation</li>
-                        <li class="toggleSelection"> Scheduling</li>
+                        <li > Scheduling</li>
                     </ul>
                 </nav>
                 <section id="sectionMenus">
-                    <nav id="competitorSectionMenuContainer" class="hiddenByDefault ">
+                    <nav id="competitorSectionMenuContainer" class="hiddenByDefault toggleSelection">
                         <ul id="competitorSectionMenu">
                             <li><div><div>  </div> </div></li>
                             <li><div><div> Divisions </div> </div></li>
@@ -52,14 +57,14 @@
                             <span data-display='selectedGame'>No Game Selected</span>
                         </li>
                         <li>
-                            <button data-button-function='toggleDebugging' data-activated=false type="button">Show Debugging</button>
+                            <button data-button-function='toggleDebugging' data-activated=false type="button">Show All Debugging</button>
                         </li>
                         <li>
                             <button data-button-function='autoGeneratePopUp' data-activated=false type="button">Generate Bracket</button>
                         </li>
                     </menu>
 
-                    <nav id="schedulingSectionMenuContainer" class="hiddenByDefault toggleSelection">
+                    <nav id="schedulingSectionMenuContainer" class="hiddenByDefault ">
                         
                     </nav>
                 </section>
@@ -68,7 +73,7 @@
         <div id="displayArea">
             <div id="configurationSectionContainer">
 
-                <div id="competitorSection" class="hiddenByDefault">
+                <div id="competitorSection" class="hiddenByDefault toggleSelection">
                     
                     <div id="competitorSectionDisplayArea">
 
@@ -183,7 +188,7 @@
 
                 </div>
 
-                <div id="scheduleSection" class="hiddenByDefault toggleSelection">
+                <div id="scheduleSection" class="hiddenByDefault ">
 
                 </div>
             </div>
@@ -192,39 +197,42 @@
     
 
     <!-- Basic Functions, nil dependancies -->
-    <script src="Basic Tools.js"></script>
+    <script src="1_Base/BasicTools.js"></script>
     <!-- Building blocks, nil dependancies -->
-    <script src="ENUM.js"></script>
-    <script src="TimeMap.js"></script>
-    <script src="DupleSet.js"></script>
-    <script src="ElementTemplate.js"></script>
+    <script src="2_BuildingBlocks/ENUM.js"></script>
+    <script src="2_BuildingBlocks/TimeMap.js"></script>
+    <script src="2_BuildingBlocks/DupleSet.js"></script>
+    <script src="2_BuildingBlocks/ElementTemplate.js"></script>
+    <script src="2_BuildingBlocks/UserInteractions.js"></script>
     <!-- Code Observer, some dependancies -->
-    <script src="CodeObserver.js"></script>
+    <script src="3_CodeObserver/CodeObserver.js"></script>
     <!-- Building structures, some dependancies -->
-    <script src="EventHandling.js"></script>
-    <script src="Verification.js"></script>
-    <script src="Registry.js"></script>
-    <script src="Search.js"></script>
+    <script src="4_Structural/EventHandling.js"></script>
+    <script src="4_Structural/Verification.js"></script>
+    <script src="4_Structural/Registry.js"></script>
+    <script src="4_Structural/Search.js"></script>
 
     <!-- Agents,nothing runs -->
-    <script src="Player.js"></script>
-    <script src="Team.js"></script>
-    <script src="Division.js"></script>
-    <script src="Competition.js"></script>
-    <script src="Phase.js"></script>
-    <script src="Block.js"></script>
-    <script src="Game.js"></script>
-    <script src="Link.js"></script>
+    <script src="5_Agents/Player.js"></script>
+    <script src="5_Agents/Team.js"></script>
+    <script src="5_Agents/Division.js"></script>
+    <script src="5_Agents/Competition.js"></script>
+    <script src="5_Agents/Phase.js"></script>
+    <script src="5_Agents/Block.js"></script>
+    <script src="5_Agents/Game.js"></script>
+    <script src="5_Agents/Link.js"></script>
 
 <!-- Outcome producers -->
-<script src="Scheduler.js"></script>
-<script src="SupportScheduler.js"></script>
-<script src="CSVGenerator.js"></script>
-<script src='AutoBracket.js'></script>
+<script src="6_Model/Scheduler.js"></script>
+<script src="6_Model/SupportScheduler.js"></script>
+<script src="6_Model/CSVGenerator.js"></script>
+<script src='6_Model/AutoBracket.js'></script>
 <!-- Set-up code necessary for things to run -->
 
 <!-- Display elements on page  -->
-<script src="UIManager.js"></script>
+<script src="7_Display/UIManager.js"></script>
+<script src="7_Display/TableGenerator.js"></script>
+
 <script src="Init.js"></script>
 <script src="testing.js"></script>
 </body>

@@ -65,6 +65,13 @@ function getHumanDate(time,options){
     let date = new Date(time);
     return`${String(date.getDate()).padStart(2,"0")}-${getMonthName(date.getMonth())}`
 }
+function getHumanUTCTimeString(utcTime){
+    let date = new Date(parseInt(utcTime));
+    let hour = String(date.getUTCHours());
+    let minute = String(date.getUTCMinutes()).padStart(2,"0");
+    let timeString = `${hour}:${minute}`;
+    return timeString;
+}
   function getDayBoundary(time){
     let date= new Date(time);
     date.setHours(0,0,0,0)

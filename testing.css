@@ -15,15 +15,3 @@ div.failed{
     background-color: greenyellow;
 }
 
-
-menu#bracketSectionMenuContainer.toggleSelection{
-    display:flex;
-    flex-wrap: wrap;
-    background-color: red;
-    margin:0;
-    width:100%;
-    overflow: hidden;
-}
-menu#bracketSectionMenuContainer *{
-    height:max-content;
-}

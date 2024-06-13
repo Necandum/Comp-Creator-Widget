@@ -164,7 +164,17 @@ var UIManager = (function () {
         return controlObject
     })();
     
-    UIManagerObject = {};
+    const UIManagerObject = {
+        helperFunctions:{
+            temporaryClass: function(html,timeToRemove,className){
+                html.classList.add(className);
+                setTimeout(()=>html.classList.remove(className),timeToRemove);
+            },
+            creationAnimation: function(html){
+                this.temporaryClass(html,1000,"newUnitAnimation");
+            },
+        },
+    };
 
     const configurationMenu$ = getE("#configurationMenu");
     const sectionMenus$=getE("#sectionMenus");
@@ -563,6 +573,8 @@ var UIManager = (function () {
                 let html = parseHTML(`
                 <menu class='popUpWindow'>
                 <section class='popUpContentContainer'>
+                </section>
+                <section class='popUpControlContainer'>
                 </section>
                 </menu>
                 `);
@@ -2166,7 +2178,8 @@ var UIManager = (function () {
                         gameStageLineInputAdder(baseStackableInput$,newLineSection$);
 
                         baseStackableInput$.querySelector("button[data-button-function='newLineInput']").addEventListener("click",(ev)=>{
-                            gameStageLineInputAdder(baseStackableInput$,newLineSection$);
+                           let newLine= gameStageLineInputAdder(baseStackableInput$,newLineSection$);
+                           UIManagerObject.helperFunctions.creationAnimation(newLine);
                         });
 
                         return baseStackableInput$;                    
@@ -2241,6 +2254,7 @@ var UIManager = (function () {
                     KeyNodes.popUp.phaseEditor$ = phasePopUp$;
 
                     const phaseEditor$ = ElementTemplates.genericForm.build(phasePopUp$,{controlledObjectConstructor:Phase});
+                    phaseEditor$.init.addClasses("phaseEditor")
 
                     
                     phaseEditor$.init.serialFunctions("switchMode",function disablePhaseTypeSelector(newMode){
@@ -2348,6 +2362,7 @@ var UIManager = (function () {
                             }
                             let newPhase = Competition.current.newPhase(newPhaseSettings.name,newPhaseSettings.phaseType);
                             newPhase.updateSettings(newPhaseSettings);
+                            newPhase.newBlock();
                             phasePopUp$.func.closePopUp();
                         }
                     });
@@ -2374,11 +2389,11 @@ var UIManager = (function () {
                         if(this.dataset.activated=="false"){
                             KeyNodes.unitContainers.bracketContainer.func.debuggingMode(true);
                             this.dataset.activated="true";
-                            this.textContent = "Hide Debugging"
+                            this.textContent = "Hide All Debugging"
                         } else {
                             KeyNodes.unitContainers.bracketContainer.func.debuggingMode(false);
                             this.dataset.activated="false";
-                            this.textContent = "Show Debugging"
+                            this.textContent = "Show All Debugging"
                         }
                     })
                 }
@@ -2459,6 +2474,7 @@ var UIManager = (function () {
                             if(unit instanceof Game){
                                 parentHtml = FacadeMap.getHtml(unit.parent);
                                 html = ElementTemplates.gameContainer.build(parentHtml,{controlledObject:unit});
+                                UniqueSelection.addMember(e.SELECTED,html);
                             }
                             if(!html) Break("Did not recoginse unit to create a htmlWrapper",{unit})
                             this.set(html,unit);
@@ -2595,7 +2611,7 @@ var UIManager = (function () {
                 `),
                 addFunctions:[refreshCosmetics,getChildren,refreshChildren,requestChildrenRefreshCosmetics,
                               updateChildOrder,refreshChildOrder,addChild,markSuccess,markFailure,deleteUnit],
-                addClasses:["unitContainer","notSelectable"],
+                addClasses:["unitContainer","notSelectable","newUnitAnimation"],
                 addDataStore:[
                     [e.CONTROLLED_OBJECT,null],
                     [e.NAME,null],
@@ -2610,6 +2626,7 @@ var UIManager = (function () {
                     this.save(e.NAME,controlledObject.name);
                     this.save(e.CHILD_CONTAINER,this.querySelector("section.childContainer"));
                     UniqueSelection.addMember(Verification,this);
+                    UIManagerObject.helperFunctions.creationAnimation(this);
                 }
 
             });
@@ -2640,10 +2657,10 @@ var UIManager = (function () {
                     addClasses:"gameAdditionButton",
                     onCompletionCode:function(mainDiv,options){
                         this.addEventListener("click",()=>{
-                            let order = this.elder['gameContainer']?.load(e.ORDER) ?? Number.POSITIVE_INFINITY;
+                            let order = this.elder['gameContainer']?.load(e.ORDER) ?? Number.NEGATIVE_INFINITY; //if undefined, then button does not have game elder
                             let createdGame =  this.elder['blockContainer'].load(e.CONTROLLED_OBJECT).newGame();
                             let createdGameHtml = FacadeMap.getHtml(createdGame);
-                            createdGameHtml.save(e.ORDER,order-0.5);
+                            createdGameHtml.save(e.ORDER,order+0.5);
                         });
                     }
                 })
@@ -2658,11 +2675,12 @@ var UIManager = (function () {
                             const sourceRank =( ev.button===0) ? 1:2;
                             if(currentlySelected===chosenGame) return false;
 
-                            if((!currentlySelected || ev.altKey)){
+                            if((ev.altKey)){
                                 if(ev.button!==0) return false;
                                 this.elder['bracketContainer'].func.selectGame(chosenGame);
                                 return true;
                             } 
+                            if(!currentlySelected) return false;
                             const currentlySelectedHtml = FacadeMap.getHtml(currentlySelected);
                             if(!ev.ctrlKey){
                                 if(!ev.shiftKey){
@@ -2693,7 +2711,10 @@ var UIManager = (function () {
                         this.load(e.CHILD_CONTAINER).replaceChildren();
                         this.func.getDisplayIndex();
                         this.func.removeDeletedLinks();
-                        this.load(e.CHILD_CONTAINER).append(gameLabelGenFunc(this.load(e.CONTROLLED_OBJECT)));
+                        let gameLabelDiv = document.createElement("div");
+                        gameLabelDiv.classList.add("gameLabel");
+                        gameLabelDiv.append(gameLabelGenFunc(this.load(e.CONTROLLED_OBJECT)))
+                        this.load(e.CHILD_CONTAINER).append(gameLabelDiv);
                         this.load(e.CHILD_CONTAINER).append(HTMLTemplates.linkLabel(e.TOP_LINK,linkLabelGenFunc(this.load(e.TOP_LINK))));
                         this.load(e.CHILD_CONTAINER).append(HTMLTemplates.linkLabel(e.BOTTOM_LINK,linkLabelGenFunc(this.load(e.BOTTOM_LINK))));
                     }
@@ -2723,6 +2744,7 @@ var UIManager = (function () {
                                 return game.name;
                             },
                             simpleOrder(game){
+                                
                                 return `Game ${FacadeMap.getHtml(game).load(e.GAME_ORDER)+1}`
                             }
                         }
@@ -2737,7 +2759,6 @@ var UIManager = (function () {
                                 if(!link) return "No Link"
                                 if(link.source instanceof Game){
                                     ranking = (link.sourceRank === 1) ? "W":"L";
-                                    console.log(link)
                                     unitName = `Game ${FacadeMap.getHtml(link.source).func.getDisplayIndex()+1}`
                                 }
                                 if(link.source instanceof Phase){
@@ -2810,14 +2831,14 @@ var UIManager = (function () {
                     addEvents:[EventTemplates.gameSelection,EventTemplates.unitDeletion,EventTemplates.callLinkPopUp],
                     addFunctions:[[refreshGameDisplay,"refreshCosmetics"],resetLinkPosition,assignLinkPosition,[getGameDisplayIndex,"getDisplayIndex"],createLink,removeDeletedLinks],
                     addAsElder:"gameContainer",
-                    addClasses:"gameContainer",
+                    addClasses:["gameContainer"],
                     addDataStore:[
                         [e.TOP_LINK,null],
                         [e.BOTTOM_LINK,null],
-                        [e.GAME_ORDER,null]
+                        [e.GAME_ORDER,null],
                     ],
                     addTemplates:[
-                        [ElementTemplates.gameAdditionButton,{parentElement:"div.anteChildrenDisplayArea"}],
+                        [ElementTemplates.gameAdditionButton,{parentElement:"div.postChildrenDisplayArea"}],
                         [ElementTemplates.genericControllingButton,{parentElement:"div.contentsDisplayArea",
                                                                     templateOptions: {addClasses:"deleteButton",
                                                                                       addDataset:[{name:"buttonFunction",value:"delete"}],
@@ -2903,7 +2924,7 @@ var UIManager = (function () {
                                 {
                                     objectField:"phaseType",
                                     htmlContents: HTMLTemplates.simpleDisplayLabel("Phase Type Here"),
-                                    harvest:Harvest.displayLabelSymbolConversion({[e.ROUND_ROBIN]:"Round Robin",[e.TOURNAMENT]:"Tournament"}),
+                                    harvest:Harvest.displayLabelSymbolConversion({[e.ROUND_ROBIN]:"(Round Robin)",[e.TOURNAMENT]:"(Tournament)"}),
                                     verify:()=>true,
                                     edit:()=>true,
                                     retrieve:Retreive.directProperty
@@ -2922,7 +2943,6 @@ var UIManager = (function () {
                             CodeObserver.addHandler(this.elder['phaseContainer'].load(e.CONTROLLED_OBJECT),(obs,{keyword})=>{
                                 if(keyword===e.EDIT) mainDiv.func.resetValues();
                             })
-                            oLog.pform = this;
                         }
                     })
                 ElementTemplates.phaseContainer = new ElementTemplate({
@@ -2934,7 +2954,10 @@ var UIManager = (function () {
                                     templateOptions:{controlledObjectConstructor:Phase}}],
                                 [ElementTemplates.blockAdditionButton,{parentElement:"div.contentsDisplayArea"}]],
                     addAsElder:"phaseContainer",
-                    addClasses:"phaseContainer"
+                    addClasses:"phaseContainer",
+                    onCompletionCode:function(){
+                        
+                    }
                 });
                     function refreshBracketCosmetics(){
                         const competitionNameLabel$ = this.querySelector("div.anteChildrenDisplayArea span");
@@ -2944,15 +2967,20 @@ var UIManager = (function () {
                         
                         const selectedGame = this.load(e.SELECTED);
                         if(selectedGame){
-                            selectedGameDisplay$.textContent = `Selected: ${selectedGame.name}`;
+                            selectedGameDisplay$.textContent = `Selected: Game ${this.load(e.GAME_ORDER).indexOf(selectedGame)+1}`;
                         } else {
                             selectedGameDisplay$.textContent = `No Game Selected`;
                         }
                     }
                     function selectGame(selectedGame){
                         this.save(e.SELECTED,selectedGame);
+                        if(selectedGame){
+                            UniqueSelection.select(e.SELECTED,FacadeMap.getHtml(selectedGame),false,["selectedGame"]);
+                        } else {
+                            UniqueSelection.wipeClasses(e.SELECTED,[e.ALL])
+                        }
                         this.func.refreshCosmetics();
-                        CodeObserver.Execution({mark:Verification,currentFunction:Verification.activate,keyword:e.VERIFICATION});
+                        CodeObserver.Execution({mark:Verification,keyword:e.VERIFICATION});
                     }
                     function selectNextGame(forwards=true){
                         const currentlySelectedGame = this.load(e.SELECTED);
@@ -2965,9 +2993,10 @@ var UIManager = (function () {
                         } else {
                             newIndex = 0;
                         }
-                        const nextGame = gameOrder[newIndex];
+                        const nextGame = gameOrder.at(newIndex);
                         if(nextGame) this.func.selectGame(nextGame);
                     }
+                   
                     function updateAllGameOrder(){
                         let allGamesOrder = this.load(e.GAME_ORDER);
                         allGamesOrder.length=0;
@@ -3006,6 +3035,8 @@ var UIManager = (function () {
                             if(keyword!==e.EDIT) return;
                             mainDiv.func.refreshCosmetics();
                         });
+                        UniqueSelection.addGroup(e.SELECTED,{alternateClasses:["selectedGame"]});
+                        UserInteraction.addHandler(UserInteraction.ESCAPE,()=>this.func.selectGame(null));
                         KeyNodes.unitContainers.bracketContainer = this;
                     }
                 });
@@ -3432,7 +3463,7 @@ var UIManager = (function () {
                         addFunctions:[resetLinkCreationAppearance],
                         mainElement:ElementTemplates.popUpBase,
                         htmlSmartInsert:{html:HTMLTemplates.buttonPanel([{label:"Ok",role:"save"},{label:"Reset",role:"reset"},{label:"Cancel",role:"cancel"}]),
-                                        destination:"menu.popUpWindow"},
+                                        destination:"section.popUpControlContainer"},
                         addDataStore:[
                             [e.CONTROLLED_OBJECT,null],
                             [e.TOP_LINK,null],
@@ -3459,6 +3490,7 @@ var UIManager = (function () {
                 autoGeneratePopUp:{
                     ElementTemplates.simpleTeamSelectionForm = new ElementTemplate({
                         mainElement: ElementTemplates.genericForm,
+                        addClasses:"autoGenerationTeams",
                         onCompletionCode: function(mainDiv,options){
                             this.func.addInputContainer(
                                 {
@@ -3493,6 +3525,8 @@ var UIManager = (function () {
                                     teamDiv.allTeams.forEach(x=>teamSet.add(x));
                                 }
                                }
+                               UIManagerObject.helperFunctions.temporaryClass(this,1000,"flashGreen")
+                               console.log(this)
                                AutoBracket.generate(AutoBracket.roundRobin,{phaseName:"New Round Robin",allowFailure:true,allowDuplicates:true,limitSetSize:true},Array.from(teamSet));
                             }
                         })
@@ -3505,7 +3539,7 @@ var UIManager = (function () {
                         htmlSmartInsert:[{html:HTMLTemplates.buttonPanel([{label:"Round-Robin",role:"roundRobin"}]),
                                         destination:"section.popUpContentContainer"},
                         {html:HTMLTemplates.buttonPanel([{label:"Close",role:"close"}]),
-                                        destination:"menu.popUpWindow"},
+                                        destination:"section.popUpControlContainer"},
                                     ],
                         addDataStore:[
                             [e.CONTROLLED_OBJECT,null],
@@ -3549,7 +3583,7 @@ var UIManager = (function () {
                     if(newObject instanceof Game || newObject instanceof Block){
                         unitHtml.elder['bracketContainer'].func.updateAllGameOrder();
                         unitHtml.elder['bracketContainer'].func.requestChildrenRefreshCosmetics();
-                        
+                        unitHtml.elder['bracketContainer'].func.refreshCosmetics();
                     }
                 }
                 function unitDeletionHandler(observer,observation){
@@ -3557,6 +3591,10 @@ var UIManager = (function () {
                     const {mark,deletedObject} = observation;
                     const deletedHtml = FacadeMap.getHtml(deletedObject);
                     deletedHtml.func.deleteUnit();
+                    if(deletedObject === KeyNodes.unitContainers.bracketContainer.load(e.SELECTED)){
+
+                        KeyNodes.unitContainers.bracketContainer.func.selectGame(null);
+                    }
                 }
 
                 function changeValidityHandler(observer,observation){
@@ -3591,8 +3629,19 @@ var UIManager = (function () {
                         if(primeSuspectHtml) UniqueSelection.select(Verification,primeSuspectHtml,true,["verificationSuspect",(visibleDebug) ? "debuggingVisible":null]);
                     }
                 }
-
+                function updateNamesHandler(observer,observation){
+                    let {mark,keyword}=observation;
+                    if(mark!==Team || keyword !==e.EDIT) return false;
+                    for (let game of Competition.current.allGamesArray){
+                        let gameHtml = FacadeMap.getHtml(game);
+                        gameHtml.func.refreshCosmetics();
+                    }
+                }
                 function selectNextGameHandler(ev){
+                    if(ev.key==="2" && ev.altKey===true && ev.repeat===false){
+                        KeyNodes.unitContainers.bracketContainer.func.selectNextGame(false);
+                        ev.preventDefault();
+                    }
                     if(ev.key==="1" && ev.altKey===true && ev.repeat===false){
                         KeyNodes.unitContainers.bracketContainer.func.selectNextGame();
                         ev.preventDefault();
@@ -3604,10 +3653,11 @@ var UIManager = (function () {
                 CodeObserver.addToHandlerGroup(e.DELETE,[unitDeletionHandler],false);
                 CodeObserver.registerHandlerGroup(e.VERIFICATION);  
                 CodeObserver.addToHandlerGroup(e.VERIFICATION,[changeValidityHandler],false);
+                CodeObserver.addToHandlerGroup(e.EDIT,[updateNamesHandler],false)
 
                 CodeObserver.addHandler(Verification,verificationRunHandler);
 
-                bracketSection$.setAttribute("tabIndex",0);
+                // bracketSection$.setAttribute("tabIndex",0);
                 bracketSection$.addEventListener("keydown",selectNextGameHandler);
                 // CodeObserver.addToHandlerGroup(e.CREATE,[(o,obs)=>console.log(obs.mark.name,"async")],true);
                 // CodeObserver.addToHandlerGroup(e.CREATE,[(o,obs)=>console.log(obs.mark.name)],false);
@@ -3625,12 +3675,24 @@ var UIManager = (function () {
                     name = link.source.name
                 }
                 if(link.source instanceof Game){
-                    name = `${KeyNodes.FacadeMap.getHtml(timeSlot.scheduledItem).load(e.NAME)} (${(teamReference.sourceRank===1) ? "W":"L"})`
+                    name = `${KeyNodes.FacadeMap.getHtml(link.source).load(e.NAME)} (${(link.sourceRank===1) ? "W":"L"})`
+                }
+                if(link.source instanceof Phase){
+                    name = `${link.source.name} [${link.sourceRank}]`
                 }
                 return name;
             },
-            getRestrictions(){Break("Must be overriden in restrictionPopUp section")}
+            getRestrictions(){Break("Must be overriden in restrictionPopUp section")},
+            currentSchedule: null,
+
         };
+        UIManagerObject.ScheduleSettings = ScheduleSettings;
+        CodeObserver.register(ScheduleSettings);
+        CodeObserver.addHandler(ScheduleSettings,newCurrentSchedule,false)
+        function newCurrentSchedule(observer,observations){
+            const {newObject} = observations;
+            ScheduleSettings.currentSchedule = newObject;
+        }
         oLog.scheduleSettings = ScheduleSettings;
 
         function runAndDisplaySchedule(){
@@ -3641,7 +3703,6 @@ var UIManager = (function () {
             let supportScheduler = new SupportScheduler(Competition.current,simpleFieldSchedule)
             let completeFieldSchedule = supportScheduler.getCompleteSchedule();
             ScheduleSettings.calendar.func.processFieldSchedule(completeFieldSchedule);
-            console.log(completeFieldSchedule);
         }
         menu:{
             const schedulingMenuForm$ = ElementTemplates.genericForm.build(null,{useAsMainDiv:"menu"});
@@ -3659,10 +3720,10 @@ var UIManager = (function () {
                 {
                 objectField:"scheduleIncrement",
                 verify:Verify.positiveInt,
-                harvest:Harvest.smartStandardNumber(15),
+                harvest:Harvest.smartStandardNumber(30),
                 retrieve:()=>1,
                 edit:()=>true,
-                htmlContents: HTMLTemplates.smartStandardNumber("Time Increment:",15)
+                htmlContents: HTMLTemplates.smartStandardNumber("Time Increment:",30)
                 },
                 {
                 objectField:"startDate",
@@ -3686,6 +3747,14 @@ var UIManager = (function () {
                 {html:HTMLTemplates.labelledButton("Schedule"),
                 controlFunction:"startScheduling",
                 func:()=>{runAndDisplaySchedule()}},
+
+                {html:HTMLTemplates.labelledButton("Get Team CSV"),
+                controlFunction:"getTeamCSV",
+                func:()=>{downloadFile(CSVGenerator.teamCSV(),"team.csv")}},
+                
+                {html:HTMLTemplates.labelledButton("Get Draw CSV"),
+                controlFunction:"getDrawCSV",
+                func:()=>{downloadFile(CSVGenerator.drawCSV(ScheduleSettings.currentSchedule),"draw.csv")}},
 
                 {html:HTMLTemplates.labelledButton("Restrictions"),
                 controlFunction:"editRestrictions",
@@ -3713,6 +3782,8 @@ var UIManager = (function () {
                                                 this.elder['displayBoard'].func.deleteRestrictionObject(this.root.load(e.DISPLAY).restrictionName)})}
                 }]
             });
+            restrictionDisplay.init.addClasses("restrictionDisplay")
+
             const restrictionForm = ElementTemplates.genericForm.build(restrictionsPopUp,{controlledObjectConstructor:Object});
                     oLog.restrictionDisplay = restrictionDisplay;
                     KeyNodes.popUp.restrictions = restrictionsPopUp;
@@ -3722,12 +3793,11 @@ var UIManager = (function () {
                 const formattedRestrictions =[];
                 const restrictionObjects = restrictionsPopUp.load(e.RESTRICTIONS);
                 for(const [restrictionName,restrictionObject] of restrictionObjects){
-                    console.log(restrictionObject);
                     let startField = restrictionObject.startField;
                     if(restrictionObject.firstField || restrictionObject.allFields) startField =0;
                     
                     let endField = restrictionObject.endField;
-                    if(restrictionObject.lastField || restrictionObject.allFields) endField =0;
+                    if(restrictionObject.lastField || restrictionObject.allFields) endField =Number.POSITIVE_INFINITY;
 
                     let startTime;
                     let endTime;
@@ -3740,6 +3810,7 @@ var UIManager = (function () {
                     }
                     if(restrictionObject.timeChoice ==="relativeDay"){
                         let compStartOfDayTime = getUTCDayBoundary(compStartDate.getTime()).dayStart;
+                        // let compStartOfDayTime = 0;
                         startTime = compStartOfDayTime + 
                                     (restrictionObject.startDay-1)*d.DAY_MS +
                                     getMsFromTimeString(restrictionObject.startTime);
@@ -3760,18 +3831,19 @@ var UIManager = (function () {
                                     (restrictionObject.endMinute)*d.MINUTE_MS;
                         length = endTime-startTime;
                     }
+                    startTime=startTime - compStartDate.getTime();
                     console.log(new Date(startTime),new Date(endTime),length)
 
                     const formattedRestriction = {
                         name: restrictionObject.restrictionName,
-                        description:"None",
+                        description:restrictionObject.restrictionName,
                         startField:startField,
                         endField:endField,
                         type:e.FIELD_CLOSURE,
                         startTime,
                         length
                     }
-                    
+                    console.log(formattedRestriction);
                     formattedRestrictions.push(formattedRestriction);
                 }
                 return formattedRestrictions;
@@ -3782,12 +3854,13 @@ var UIManager = (function () {
             restrictionsPopUp.init.addDataStore([e.FORM,restrictionForm]);
             restrictionsPopUp.init.htmlSmartInsert(
             {html:()=>HTMLTemplates.buttonPanel([{label:"Close",role:"close",func:function(ev){this.elder["popupbase"].func.closePopUp()}}]),
-            destination:"menu.popUpWindow",
+            destination:"section.popUpControlContainer",
             });
             
             restrictionsPopUp.func.addContent(restrictionForm);
             restrictionsPopUp.func.addContent(restrictionDisplay);
             //Form set-up
+            restrictionForm.init.addClasses("restrictionEditor")
             restrictionForm.func.addInputSection("basicDetails","timeChoice","timeDetails");
             UniqueSelection.addGroup(e.DISPLAY);
             UniqueSelection.addFamily(e.DISPLAY,[],"relativeDay");//aliases correspond to radio button values for type of time selection
@@ -3838,12 +3911,12 @@ var UIManager = (function () {
                     harvest:Harvest.fireChangeSingleCheckbox,
                     retrieve:Retreive.directProperty,
                     edit:Edit.directProperty,
-                    htmlContents: HTMLTemplates.smartStandardSingleCheckbox("All Fields"),
+                    htmlContents: HTMLTemplates.smartStandardSingleCheckbox("All Fields "),
                     destination:"section.basicDetails",
                     addEvents:[{triggers:["change","progChange"],func:function(ev){
                         let checked = this.func.harvest();
-                    if(checked) this.elder['form'].querySelectorAll("section.basicDetails div:not([data-object-field=allFields]) input")?.forEach(x=>{if(x.getAttribute("disabled")!=='true')x.setAttribute("disabled",false)});
-                    else this.elder['form'].querySelectorAll("section.basicDetails input")?.forEach(x=>{if(x.getAttribute("disabled")==='false') x.removeAttribute("disabled")});
+                    if(checked) this.elder['form'].querySelectorAll("section.basicDetails div:not([data-object-field=allFields]) input:not([type='text'])")?.forEach(x=>{if(x.getAttribute("disabled")!=='true')x.setAttribute("disabled",false)});
+                    else this.elder['form'].querySelectorAll("section.basicDetails input:not([type='text'])")?.forEach(x=>{if(x.getAttribute("disabled")==='false') x.removeAttribute("disabled")});
                     }}]
                     },
                     {
@@ -3852,7 +3925,7 @@ var UIManager = (function () {
                     harvest:Harvest.fireChangeSingleCheckbox,
                     retrieve:Retreive.directProperty,
                     edit:Edit.directProperty,
-                    htmlContents: HTMLTemplates.smartStandardSingleCheckbox("First Field"),
+                    htmlContents: HTMLTemplates.smartStandardSingleCheckbox("First Field "),
                     destination:"section.basicDetails",
                     addEvents:[{triggers:["change","progChange"],func:function(ev){
                         let checked = this.func.harvest();
@@ -3875,7 +3948,7 @@ var UIManager = (function () {
                     harvest:Harvest.fireChangeSingleCheckbox,
                     retrieve:Retreive.directProperty,
                     edit:Edit.directProperty,
-                    htmlContents: HTMLTemplates.smartStandardSingleCheckbox("Last Field"),
+                    htmlContents: HTMLTemplates.smartStandardSingleCheckbox("Last Field "),
                     destination:"section.basicDetails",
                     addEvents:[{triggers:["change","progChange"],func:function(ev){
                         let checked = this.func.harvest();
@@ -4069,7 +4142,6 @@ var UIManager = (function () {
         scheduleTable:{
             ElementTemplates.calendarControls = new ElementTemplate({
                 mainElement: ElementTemplates.genericForm,
-                htmlInsert:"Controls",
                 addDataStore:[
                    
                 ],
@@ -4098,6 +4170,8 @@ var UIManager = (function () {
                 }
 
                 rowContainer.append(tr);
+                this.load(e.CELL_TIME).set(rowReference,rowReference);
+                UniqueSelection.addMember(this,rowReference.htmlRow);
                 return rowReference;
             }
             function createCaps(table,fieldNumber){
@@ -4112,11 +4186,12 @@ var UIManager = (function () {
                 }
                 table.prepend(headingRow);
             }
-            function createCalendarGrid(fieldNumber=2){
+            function createCalendarGrid(fieldNumber=1){
                  const increment =   this.load(e.INCREMENT) 
                  const startTime = this.load(e.START_TIME)
                  const setPointForToday = this.load(e.SET_POINT) + startTime;
                  const endTime=   this.load(e.END_TIME)
+                 let earliestRowTime;
                  let rowTimes =[];
 
                  const {table,rowContainer} = this.func.createTable();
@@ -4126,13 +4201,14 @@ var UIManager = (function () {
                     }
                  for(let currentTime=setPointForToday-increment;currentTime>=startTime;currentTime= currentTime-increment){
                      rowTimes.unshift(currentTime)
+                     earliestRowTime = currentTime;
                  }
+
+                 this.func.createRow(startTime,earliestRowTime-startTime,fieldNumber,rowContainer)
                  
                  for(const rowTime of rowTimes){
                     const adjustedIncrement = ((rowTime+increment)>endTime) ? endTime-rowTime:increment;
-                    const rowReference= this.func.createRow(rowTime,adjustedIncrement,fieldNumber,rowContainer);
-                    this.load(e.CELL_TIME).set(rowReference,rowReference);
-                    UniqueSelection.addMember(this,rowReference.htmlRow);
+                   this.func.createRow(rowTime,adjustedIncrement,fieldNumber,rowContainer);
                  }
 
                 //  this.func.createCaps(rowContainer)
@@ -4142,7 +4218,8 @@ var UIManager = (function () {
             }
             function fillCalendarGrid(withinDaySet){
                 for(let timeSlot of withinDaySet){
-                    let appropriateRow = this.load(e.CELL_TIME).findOverlap(timeSlot.absoluteStartTime).items[0];
+                    let timeSlotAdjustedStartTime = (timeSlot.absoluteStartTime<this.load(e.START_TIME)) ? this.load(e.START_TIME):timeSlot.absoluteStartTime
+                    let appropriateRow = this.load(e.CELL_TIME).findOverlap(timeSlotAdjustedStartTime).items[0];
                     let cellText;
                     if(timeSlot.type === e.GAME_SLOT){
 
@@ -4150,11 +4227,17 @@ var UIManager = (function () {
                         for(let inLink of timeSlot.scheduledItem.incomingLinks){
                             teamNames.push(ScheduleSettings.getNameFromLink(inLink))
                         }
-                        cellText = `${KeyNodes.FacadeMap.getHtml(timeSlot.scheduledItem).load(e.NAME)}: ${teamNames[1]} vs. ${teamNames[0]}
-                        (Duty:${ScheduleSettings.getNameFromLink(timeSlot.supportRoles.get(SupportScheduler.DUTY))}) `;
+                        cellText = newE("div");
+                        cellText.classList.add("cellText")
+                        let firstLine = newE("p");
+                        firstLine.append( `${KeyNodes.FacadeMap.getHtml(timeSlot.scheduledItem).load(e.NAME)}: ${teamNames[1]} vs. ${teamNames[0]}`);
+                        cellText.append(firstLine)
+                        let secondLine = newE("p");
+                        secondLine.append(`(Duty:${ScheduleSettings.getNameFromLink(timeSlot.supportRoles.get(SupportScheduler.DUTY))}) `);
+                        cellText.append(secondLine)
                     }
                     if(timeSlot.type === e.FIELD_CLOSURE){
-                        cellText="Closed";
+                        cellText=timeSlot.description;
                     }
                     appropriateRow.fieldCell[timeSlot.fieldNumber].append(cellText);
                     appropriateRow.empty=false;
@@ -4177,8 +4260,8 @@ var UIManager = (function () {
                 }
             }
             ElementTemplates.calendarDayDisplay = new ElementTemplate({
-                addAsElder:"calendarDisplay",
-                addClasses:["calendarDisplay","hiddenByDefault"],
+                addAsElder:"calendarDayDisplay",
+                addClasses:["calendarDayDisplay","hiddenByDefault"],
                 addDataStore:[
                     [e.SET_POINT,null],
                     [e.INCREMENT,null],
@@ -4256,7 +4339,7 @@ var UIManager = (function () {
                 addAsElder:"calendar",
                 addFunctions:[getDayBoundary,getIncrement,clearCalendarDisplay,addCalendarDisplay,processFieldSchedule,getSetPoint],
                 htmlInsert: parseHTML(`
-                <section class='controlPanel'> CONTROL PANEL 
+                <section class='controlPanel'>
                 <nav class='daySelection'> DAYS </nav>
                 </section>
                 <section class='calendarDisplay'>CALENDERS</section>

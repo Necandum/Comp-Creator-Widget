@@ -1,0 +1,67 @@
+.inputContainer:has(>.teamSelector){
+width:100%;
+}
+
+.teamSelector {
+    display:grid;
+    justify-content: center;
+    width:100%;
+    grid-template-columns: 1fr;
+}
+.teamSelector>select {
+    width:200px;
+    min-height:120px;
+    grid-column: 1/-1;
+    justify-self: center;
+}
+.teamSelector>.teamDisplay {
+   grid-column: 1/-1;
+   width:100%;
+   justify-self: center;
+   display:grid;
+   grid-template-columns: 1fr 1fr 1fr;
+   grid-auto-rows: max-content;
+   gap:3px;
+   margin-top:0.3em;
+}
+
+.teamSelector>.teamDisplay>.teamDisplayTag{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: max-content;
+    grid-auto-rows: 1fr;
+    border:1px solid black;
+    border-radius: 8px;
+    background-color: lightgreen;
+}
+.teamSelector>.teamDisplay>.teamDisplayTag:has(>ul){
+    grid-row-end: span 2;
+   
+}
+.teamSelector>.teamDisplay>.teamDisplayTag>h3{
+    grid-area: 1/1;
+    text-align: center;
+    margin: 0.6em 0;
+    
+}
+.teamSelector>.teamDisplay>.teamDisplayTag>button{
+    grid-area:1/2;
+    width:max-content;
+    height: max-content;
+    justify-self: left;
+    align-self: center;
+}
+.teamSelector>.teamDisplay>.teamDisplayTag>ul{
+    grid-column: 1/-1;
+    padding:0.4em;
+    display:flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin:0;
+}
+.teamSelector>.teamDisplay>.teamDisplayTag>ul>*{
+    min-width:calc(33% - 6px);
+}
+.teamSelector>.teamDisplay>.teamDisplayTag>ul>li{
+
+}
